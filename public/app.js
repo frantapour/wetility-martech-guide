@@ -724,9 +724,10 @@ function connCard(v) {
    ${open ? `<form class="f" data-form="conn-save" data-id="${v.id}" autocomplete="off" style="margin-top:10px">
     ${v.fields.map(field).join("")}
     <p class="muted" style="font-size:12.5px;margin:0">Keys are stored encrypted and never shown again. Use credentials owned by a Wetility admin account, not a personal or agency one.</p>
-    <div class="acts"><button class="btn primary" type="submit">${icon("key", "sm")}Save</button>
-    ${v.configured ? `<button class="btn" type="button" data-act="conn-test" data-id="${v.id}">${icon("check", "sm")}Test connection</button><button class="btn" type="button" data-act="conn-sync" data-id="${v.id}">${icon("upload", "sm")}Sync now</button><button class="btn ghost" type="button" data-act="conn-remove" data-id="${v.id}">Remove keys</button>` : ""}</div>
+    <div class="acts"><button class="btn primary" type="submit">${icon("key", "sm")}Save</button>${v.fields.some(f => f.saved) ? `<button class="btn ghost" type="button" data-act="conn-remove" data-id="${v.id}">Remove keys</button>` : ""}</div>
    </form>` : ""}
+   <div class="acts" style="margin-top:10px"><button class="btn" type="button" data-act="conn-test" data-id="${v.id}" ${v.configured ? "" : "disabled"}>${icon("check", "sm")}Test connection</button><button class="btn" type="button" data-act="conn-sync" data-id="${v.id}" ${v.configured ? "" : "disabled"}>${icon("upload", "sm")}Sync now</button></div>
+   ${v.configured ? "" : `<p class="muted" style="font-size:12.5px;margin:6px 0 0">To test and sync, ${open ? "fill in and save" : "open this card and save"}: <b>${esc((v.missing || []).join(", "))}</b>.</p>`}
    ${v.lastTest && open ? `<div class="box ${v.lastTest.ok ? "ok" : "bad"}"><b>${v.lastTest.ok ? "Connection works" : "Connection failed"}</b>${esc(v.lastTest.message)} <span class="muted" style="font-size:12px">${fmtDT(v.lastTest.at)}</span></div>` : ""}
    ${S.connBusy === v.id ? `<div class="box info"><b>Syncing…</b>Reading configuration from ${esc(v.name)}. This can take a minute.</div>` : ""}
    ${r ? `<h3>Sync result</h3><div class="list">${r.report.map(x => `<div class="row" style="grid-template-columns:24px minmax(0,1fr) auto"><div>${icon(x.ok ? "check" : "x", "sm")}</div><div class="txt"><b>${esc(x.part)}</b>${x.note ? ` <span class="muted">${esc(x.note)}</span>` : ""}${x.ok ? "" : `<div class="by sev-high">${esc(x.error)}</div>`}</div><div class="pill ${x.ok ? "ok" : "bad"}">${x.ok ? x.count + " items" : "failed"}</div></div>`).join("")}</div>
@@ -932,7 +933,7 @@ document.addEventListener("submit", async e => {
       case "merge": await api("POST", `/api/fields/${id}/merge`, { into: d.into }); toast("Merged"); await load(); location.hash = "f-" + d.into; return;
       case "impl": { const body = { ...d, std: fd.has("std") }; if (id) await api("PUT", "/api/impls/" + id, body); else await api("POST", "/api/impls", body); toast(id ? "Saved" : "Added to registry");
         if (!id) { S.prefSys = null; S.prefField = null; await load(); location.hash = d.field_id ? "f-" + d.field_id : "registry"; return; } break; }
-      case "conn-save": { connSet(await api("POST", "/api/connections/" + id, d)); toast("Saved"); render(true); return; }
+      case "conn-save": { const v = await api("POST", "/api/connections/" + id, d); connSet(v); S.connOpen = id; toast(v.configured ? "Saved. Now click Test connection." : "Saved. Still needed: " + v.missing.join(", ")); render(true); return; }
       case "invite": { const r = await api("POST", "/api/users", d); S.tempPw = { email: r.email, pw: r.tempPassword }; S.users = null; f.reset(); render(true); return; }
       case "password": await api("POST", "/api/password", d); toast("Password saved"); S.me.must_change = false; await load(); location.hash = "overview"; render(); return;
     }

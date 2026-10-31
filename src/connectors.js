@@ -57,7 +57,7 @@ const CONNECTORS = [
     id: "freshsales", name: "Freshsales", systems: ["freshsales"],
     intro: "Field definitions for Contacts, Deals and Accounts, lifecycle stages and deal pipelines. Never reads contacts or deals.",
     fields: [
-      { key: "domain", label: "Freshsales domain", placeholder: "wetility.myfreshworks.com", help: "The address you use to open Freshsales." },
+      { key: "domain", label: "Freshsales domain", placeholder: "wetility.myfreshworks.com", default: "wetility.myfreshworks.com", help: "The address you use to open Freshsales." },
       { key: "apiKey", label: "API key", secret: true, help: "Freshsales: profile picture → Profile settings → API settings. Acts with that user's permissions; use an admin-owned account, not a personal or agency one." }
     ],
     _call(c, path) { const d = String(c.domain || "").replace(/^https?:\/\//, "").replace(/\/.*$/, ""); if (!d || !c.apiKey) throw fail("Save the domain and API key first."); return http(`https://${d}/crm/sales/api${path}`, { headers: { Authorization: `Token token=${c.apiKey}` }, label: "Freshsales" }); },
@@ -271,10 +271,11 @@ function creds(def, st) {
   return c;
 }
 function view(def, st) {
-  const configured = def.fields.filter(f => !f.optional).every(f => f.secret ? st.secrets?.[f.key] : st.values?.[f.key]);
+  const missing = def.fields.filter(f => !f.optional && !(f.secret ? st.secrets?.[f.key] : st.values?.[f.key])).map(f => f.label);
+  const configured = !missing.length;
   return { id: def.id, name: def.name, systems: def.systems, intro: def.intro,
-    fields: def.fields.map(f => ({ key: f.key, label: f.label, secret: !!f.secret, placeholder: f.placeholder || "", help: f.help || "", type: f.type || "", value: f.secret ? "" : (st.values?.[f.key] || ""), saved: f.secret ? !!st.secrets?.[f.key] : undefined, last4: f.secret && st.secrets?.[f.key] ? st.secrets[f.key].last4 : "" })),
-    configured: !!configured, lastTest: st.lastTest, lastSync: st.lastSync };
+    fields: def.fields.map(f => ({ key: f.key, label: f.label, secret: !!f.secret, placeholder: f.placeholder || "", help: f.help || "", type: f.type || "", value: f.secret ? "" : (st.values?.[f.key] || f.default || ""), saved: f.secret ? !!st.secrets?.[f.key] : undefined, last4: f.secret && st.secrets?.[f.key] ? st.secrets[f.key].last4 : "" })),
+    configured, missing, lastTest: st.lastTest, lastSync: st.lastSync };
 }
 
 // ---------- merge into registry ----------
