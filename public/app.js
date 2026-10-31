@@ -82,9 +82,10 @@ function analyze() {
 }
 
 // ---------- small renderers ----------
+const OPT_ICON = { todo: "circle", progress: "play", done: "check", blocked: "x", pass: "check", fail: "x", approved: "check" };
 function sel(key, opts) {
-  const v = st(key), r = S.statusMap[key];
-  return `<select class="state" data-key="${key}" data-v="${v}" aria-label="Status" ${canWrite() ? "" : "disabled"}>${opts.map(([k, l]) => `<option value="${k}" ${k === v ? "selected" : ""}>${l}</option>`).join("")}</select>${r ? `<div class="by">${esc(nameOf(r.by_user))} · ${fmtD(r.at)}</div>` : ""}`;
+  const v = st(key), r = S.statusMap[key], dis = canWrite() ? "" : "disabled";
+  return `<div class="stctl"><div class="seg" role="group" aria-label="Status">${opts.map(([k, l]) => `<button type="button" data-act="set-state" data-key="${key}" data-v="${k}" class="${k === v ? "on" : ""}" aria-pressed="${k === v}" ${dis}>${icon(OPT_ICON[k] || "circle", "sm")}${l}</button>`).join("")}</div>${r ? `<div class="stmeta">${esc(nameOf(r.by_user))} · ${fmtD(r.at)}</div>` : ""}</div>`;
 }
 const pbProgress = p => { let d = 0, b = 0, g = 0; p.steps.forEach((_, i) => { const v = st(`${p.id}-s${i + 1}`); if (v === "done") d++; else if (v === "blocked") b++; else if (v === "progress") g++; }); return { d, b, g, n: p.steps.length }; };
 const bar = pr => { const w = x => (x / pr.n * 100).toFixed(1) + "%"; return `<div class="bar" role="img" aria-label="${pr.d} of ${pr.n} done"><i class="d" style="width:${w(pr.d)}"></i><i class="p" style="width:${w(pr.g)}"></i><i class="b" style="width:${w(pr.b)}"></i></div>`; };
@@ -165,34 +166,64 @@ function kbPanel(pbId) {
 }
 
 // ---------- views: programme ----------
-function vOverview() {
-  const all = PB.reduce((a, p) => { const r = pbProgress(p); a.d += r.d; a.b += r.b; a.n += r.n; return a; }, { d: 0, b: 0, n: 0 });
-  const gatesOk = GATES.filter(g => st("gate-" + g[0]) === "approved").length;
-  const qaPass = QA.filter(q => st("qa-" + q[0]) === "pass").length, qaFail = QA.filter(q => st("qa-" + q[0]) === "fail");
-  const openIssues = S.data.issues.filter(x => x.state === "open");
-  const A = S.A;
+function attentionItems() {
+  const A = S.A, openIssues = S.data.issues.filter(x => x.state === "open");
   const blocked = []; PB.forEach(p => p.steps.forEach((s, i) => { if (st(`${p.id}-s${i + 1}`) === "blocked") blocked.push([p, i, s]); }));
+  const qaFail = QA.filter(q => st("qa-" + q[0]) === "fail");
   const kOff = KPIS.filter(k => { const h = S.data.results.filter(r => r.kpi === k.id); if (!h.length || k.target == null) return false; const v = Number(h.at(-1).value); return !(k.dir === "min" ? v >= k.target : v <= k.target); });
-  const att = [
-    ...(st("gate-G1") !== "approved" ? [`<div class="box bad"><b>Live exposure check: 620+ credit signal to ad platforms</b>G1 privacy is not yet approved. Confirm Information Officer / Legal sign-off for the threshold signal by 7 Nov 2026. <a href="#read">Details</a></div>`] : []),
-    ...(A.privacy.length ? [`<div class="box bad"><b>${A.privacy.length} privacy conflict${A.privacy.length > 1 ? "s" : ""} in the tracking registry</b>Sensitive or personal data recorded in a system where it must not appear. <a href="#consistency">Review</a></div>`] : []),
-    ...(A.dups.length ? [`<div class="box warn"><b>${A.dups.length} duplicate implementation${A.dups.length > 1 ? "s" : ""}</b>The same event or field is implemented more than once in one system. <a href="#consistency">Review</a></div>`] : []),
-    ...openIssues.filter(x => x.severity === "high").map(x => `<div class="box warn"><b>High-severity problem: ${esc(x.title)}</b><a href="#issues">Open issues</a></div>`),
-    ...blocked.map(([p, i, s]) => `<div class="box warn"><b>Blocked: ${p.no} step ${i + 1}</b>${esc(s.slice(0, 140))}${s.length > 140 ? "…" : ""} <a href="#${p.id}">Open</a></div>`),
+  return [
+    ...(st("gate-G1") !== "approved" ? [`<div class="box bad"><b>Live exposure: 620+ credit signal to ad platforms</b>G1 privacy is not approved yet. Confirm Information Officer sign-off by 7 Nov 2026. <a href="#read">Details</a></div>`] : []),
+    ...(A.privacy.length ? [`<div class="box bad"><b>${A.privacy.length} privacy conflict${A.privacy.length > 1 ? "s" : ""} in tracking</b>Sensitive or personal data recorded where it must not be. <a href="#consistency">Review</a></div>`] : []),
+    ...openIssues.filter(x => x.severity === "high").map(x => `<div class="box warn"><b>${esc(x.title)}</b>High-severity problem. <a href="#issues">Open</a></div>`),
+    ...(A.dups.length ? [`<div class="box warn"><b>${A.dups.length} duplicate${A.dups.length > 1 ? "s" : ""} in tracking</b>Same thing implemented twice in one system. <a href="#consistency">Review</a></div>`] : []),
+    ...blocked.map(([p, i, s]) => `<div class="box warn"><b>Blocked: ${p.no} step ${i + 1}</b>${esc(s.slice(0, 120))}${s.length > 120 ? "…" : ""} <a href="#${p.id}">Open</a></div>`),
     ...qaFail.map(q => `<div class="box warn"><b>Test failed: ${q[0]}</b>${esc(q[1])} <a href="#qa">Open</a></div>`),
     ...kOff.map(k => `<div class="box warn"><b>Off target: ${esc(k.name)}</b><a href="#results">Open</a></div>`)];
-  return `<div class="eyebrow">Programme overview</div><h1>Is the MarTech programme on track?</h1>
-  <p class="muted">Ownership, integrity, identity and conversion signals across the website, app, WhatsApp, CRM, field operations, analytics and ad platforms.</p>
-  <div class="tiles">
-   <div class="tile"><div class="n">${all.d}/${all.n}</div><div class="l">Playbook steps done</div></div>
-   <div class="tile"><div class="n">${gatesOk}/7</div><div class="l">Gates approved</div></div>
-   <div class="tile"><div class="n">${qaPass}/${QA.length}</div><div class="l">QA tests passed</div></div>
-   <div class="tile"><div class="n">${openIssues.length}</div><div class="l">Open problems</div></div>
-   <div class="tile"><div class="n">${A.score == null ? "–" : A.score + "%"}</div><div class="l">Tracking names consistent</div></div></div>
-  <h2>Needs attention</h2>${att.length ? att.join("") : `<div class="empty">Nothing blocked, failed, conflicting or off target.</div>`}
-  <h2>Workstreams</h2><div class="list">${WS.map(w => { const ps = w[4].map(id => PB.find(p => p.id === id)); const pr = ps.reduce((a, p) => { const r = pbProgress(p); a.d += r.d; a.b += r.b; a.g += r.g; a.n += r.n; return a; }, { d: 0, b: 0, g: 0, n: 0 });
-    return `<div class="row"><div class="num">WS${w[0]}</div><div class="txt"><b>${esc(w[1])}</b><div class="by">${esc(w[2])} · ${esc(w[3])}</div><div style="margin-top:6px">${bar(pr)}</div><div class="by">${ps.map(p => `<a href="#${p.id}">${p.no}</a>`).join(" · ")}</div></div><div class="pill ${pr.b ? "bad" : pr.d === pr.n ? "ok" : pr.d || pr.g ? "warn" : ""}">${pr.d}/${pr.n}</div></div>`; }).join("")}</div>
-  <h2>Latest implementation entries</h2><div class="feed">${S.data.logs.length ? S.data.logs.slice(0, 5).map(entryHTML).join("") : `<div class="empty">No implementation recorded yet. Open a playbook and use "Record implementation".</div>`}</div>`;
+}
+function nextSteps() {
+  const out = [];
+  PB.filter(p => !filterMe || isMine(p.owner)).forEach(p => {
+    const states = p.steps.map((_, i) => st(`${p.id}-s${i + 1}`));
+    let i = states.indexOf("progress"); if (i < 0) i = states.indexOf("blocked"); if (i < 0) i = states.indexOf("todo");
+    if (i >= 0) out.push({ p, i, v: states[i], pr: pbProgress(p) });
+  });
+  const rank = { progress: 0, blocked: 1, todo: 2 };
+  return out.sort((a, b) => rank[a.v] - rank[b.v] || a.p.ws - b.p.ws);
+}
+function parseWeeks(w) { const m = String(w).match(/(\d+)\s*[–-]\s*(\d+)/); return m ? [+m[1], +m[2]] : [4, 14]; }
+function vOverview() {
+  const all = PB.reduce((a, p) => { const r = pbProgress(p); a.d += r.d; a.n += r.n; return a; }, { d: 0, n: 0 });
+  const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  const openIssues = S.data.issues.filter(x => x.state === "open").length, gatesOk = GATES.filter(g => st("gate-" + g[0]) === "approved").length;
+  const ns = nextSteps().slice(0, 5), att = attentionItems();
+  const recent = [
+    ...S.data.logs.map(l => ({ at: l.at, who: l.by_user, t: `recorded <b>${esc(l.ref || "an implementation")}</b>`, href: "#" + l.sec })),
+    ...S.data.issues.map(x => ({ at: x.state === "resolved" ? x.resolved_at : x.at, who: x.state === "resolved" ? x.resolved_by : x.by_user, t: `${x.state === "resolved" ? "resolved" : "logged"} <b>${esc(x.title)}</b>`, href: "#issues" })),
+    ...S.data.audit.filter(a => a.entity !== "user").map(a => ({ at: a.at, who: a.by_user, t: `${esc(a.action)} ${esc(a.entity === "impl" ? "a tracking item" : a.entity === "kb" ? "a guidance article" : a.entity)}`, href: a.entity === "kb" ? "#kb-" + a.entity_id : "#consistency" }))]
+    .filter(x => x.at).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 7);
+  return `<section class="hero"><div class="eyebrow">${new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })}</div>
+  <h1>${greet}, ${esc((S.me.name || "").split(" ")[0])}</h1><p>${filterMe ? `Showing ${esc(filterMe)}'s playbooks.` : "The MarTech programme at a glance."} ${all.d} of ${all.n} playbook steps done.</p>
+  <div class="stats"><div><b>${Math.round(all.d / all.n * 100)}%</b><span>Steps done</span></div><div><b>${gatesOk}/7</b><span>Gates approved</span></div><div><b>${openIssues}</b><span>Open problems</span></div><div><b>${S.A.score == null ? "–" : S.A.score + "%"}</b><span>Tracking names consistent</span></div></div>
+  <div class="focus"><label for="iam2" style="font-size:13px;color:#B9C6DA">Focus on</label><select id="iam2" data-focus="1"><option value="">Everyone</option>${PEOPLE.map(n => `<option ${n === filterMe ? "selected" : ""}>${n}</option>`).join("")}</select></div></section>
+  <div class="cols"><div>
+   <h2>${icon("target")} Next steps</h2>
+   <div class="next">${ns.length ? ns.map(({ p, i, v, pr }) => `<div class="card nextcard">${ring(pr.d / pr.n * 100, 46)}<div class="t"><b><a href="#${p.id}" style="color:inherit;text-decoration:none">${p.no} ${esc(p.title)}</a></b><div class="s">Step ${i + 1}: ${esc(p.steps[i])}</div>${v !== "todo" ? `<span class="pill ${v === "blocked" ? "bad" : "sun"}" style="margin-top:6px">${v === "blocked" ? "Blocked" : "In progress"}</span>` : ""}</div>
+     <div class="acts" style="flex-direction:column;align-items:stretch">${canWrite() ? (v === "todo" ? `<button class="btn sm" data-act="set-state" data-key="${p.id}-s${i + 1}" data-v="progress">${icon("play", "sm")}Start</button>` : `<button class="btn sm primary" data-act="set-state" data-key="${p.id}-s${i + 1}" data-v="done">${icon("check", "sm")}Done</button>`) : ""}<a class="btn sm ghost" href="#${p.id}">Open</a></div></div>`).join("") : `<div class="empty">${icon("check")}Nothing left to do${filterMe ? " in " + esc(filterMe) + "'s playbooks" : ""}.</div>`}</div>
+   <h2>${icon("calendar")} Workstream timeline</h2>
+   <div class="card timeline"><div class="tl-axis"><div></div><div><span>Week 1</span><span>Week 7</span><span>Week 14</span></div></div>
+   ${WS.map(w => { const ps = w[4].map(id => PB.find(p => p.id === id)); const pr = ps.reduce((a, p) => { const r = pbProgress(p); a.d += r.d; a.b += r.b; a.n += r.n; return a; }, { d: 0, b: 0, n: 0 }); const [a, b] = parseWeeks(w[3]);
+     return `<div class="tl-row"><a href="#${ps[0].id}" title="${esc(w[1])}">WS${w[0]} ${esc(w[1])}</a><div class="tl-track"><div class="tl-bar${pr.b ? " blocked" : ""}" style="left:${(a - 1) / 14 * 100}%;width:${(b - a + 1) / 14 * 100}%" title="${esc(w[3])}: ${pr.d}/${pr.n} steps done"><i style="width:${pr.d / pr.n * 100}%"></i></div></div></div>`; }).join("")}
+   <p class="muted" style="font-size:12px;margin:8px 0 0">Bars show each workstream's indicative window; the fill shows steps done.</p></div>
+  </div><div>
+   <h2>${icon("alert")} Needs attention</h2>${att.length ? att.slice(0, 6).join("") + (att.length > 6 ? `<p class="muted" style="font-size:13px">${att.length - 6} more on the <a href="#issues">problems</a> and <a href="#consistency">consistency</a> pages.</p>` : "") : `<div class="empty">${icon("check")}Nothing blocked, failed or conflicting.</div>`}
+   <h2>${icon("log")} Recent activity</h2><div class="card" style="padding:4px 16px">${recent.length ? recent.map(r => `<div class="act-item"><span class="dot"></span><div><a href="${r.href}" style="color:inherit;text-decoration:none">${esc(nameOf(r.who))} ${r.t}</a><div class="by">${fmtDT(r.at)}</div></div></div>`).join("") : `<p class="muted" style="padding:10px 0">No activity yet.</p>`}</div>
+  </div></div>`;
+}
+function vPlaybooks() {
+  return `<div class="eyebrow">Playbooks</div><h1>Implementation playbooks</h1><p class="lede">Thirteen playbooks in eight workstreams. Each has its steps, the current vendor guidance, problems and fixes, and what was implemented.</p>
+  <div class="acts" style="margin:14px 0 6px"><a class="btn" href="#read">${icon("alert", "sm")}Read this first</a><a class="btn" href="#gates">${icon("gate", "sm")}Gates G0–G6</a><a class="btn" href="#qa">${icon("check", "sm")}QA tests</a><a class="btn" href="#approval">${icon("shield", "sm")}Final approval</a></div>
+  ${WS.map(w => `<h2>Workstream ${w[0]} <span class="count">${esc(w[3])}</span></h2><p class="muted" style="margin-top:-6px">${esc(w[1])} · ${esc(w[2])}</p><div class="pbgrid">${w[4].map(id => { const p = PB.find(x => x.id === id), pr = pbProgress(p);
+    return `<a class="card pbcard" href="#${p.id}">${ring(pr.d / pr.n * 100, 48)}<div class="t"><small>${p.no}${isMine(p.owner) ? " · yours" : ""}</small><b>${esc(p.title)}</b><small>${pr.d}/${pr.n} steps${pr.b ? ` · <span class="sev-high">${pr.b} blocked</span>` : ""}</small></div></a>`; }).join("")}</div>`).join("")}`;
 }
 function vRead() {
   return `<div class="eyebrow">Read this first</div><h1>How to use this guide</h1>
@@ -214,18 +245,47 @@ function vWS() {
   <div class="tbl"><table><tr><th>WS</th><th>Workstream</th><th>Proposed owner</th><th>Window</th><th>Progress</th></tr>${WS.map(w => { const pr = w[4].map(id => pbProgress(PB.find(p => p.id === id))).reduce((a, r) => ({ d: a.d + r.d, b: a.b + r.b, g: a.g + r.g, n: a.n + r.n }), { d: 0, b: 0, g: 0, n: 0 });
     return `<tr><td class="n">${w[0]}</td><td>${esc(w[1])}<div class="by muted">${w[4].map(id => `<a href="#${id}">${PB.find(x => x.id === id).no}</a>`).join(" · ")}</div></td><td>${esc(w[2])}</td><td class="n">${w[3]}</td><td style="min-width:110px">${bar(pr)}<div class="by muted">${pr.d}/${pr.n} done${pr.b ? `, ${pr.b} blocked` : ""}</div></td></tr>`; }).join("")}</table></div>${commentsBlock("ws")}`;
 }
+function inlineLog(sec, ref, key) {
+  return `<form class="f inline" data-form="log" data-sec="${sec}"><input type="hidden" name="ref" value="${esc(ref)}"><div class="two"><label for="ld-${key}">Date implemented<input id="ld-${key}" name="date" type="date" required value="${new Date().toISOString().slice(0, 10)}"></label><label for="le-${key}">Evidence link (optional)<input id="le-${key}" name="evidence" type="url" placeholder="https://"></label></div>
+  <label for="lt-${key}">What did you implement?<textarea id="lt-${key}" name="text" required maxlength="4000"></textarea></label><div class="acts"><button class="btn primary" type="submit">Record</button><button class="btn ghost" type="button" data-act="inline" data-k="">Cancel</button></div></form>`;
+}
+function inlineIssue(sec, ref, key) {
+  return `<form class="f inline" data-form="issue" data-sec="${sec}" data-ref="${esc(ref)}"><label for="it-${key}">What is not working?<input id="it-${key}" name="title" required maxlength="200"></label>
+  <div class="two"><label for="is-${key}">Severity<select id="is-${key}" name="severity"><option value="high">High: blocks the work</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label></div>
+  <label for="id-${key}">Details (what you tried, error messages)<textarea id="id-${key}" name="detail" maxlength="4000"></textarea></label><div class="acts"><button class="btn primary" type="submit">Log problem</button><button class="btn ghost" type="button" data-act="inline" data-k="">Cancel</button></div></form>`;
+}
+function stepCard(p, kind, i, text) {
+  const key = `${p.id}-${kind}${i + 1}`, v = st(key), ref = kind === "s" ? `Step ${i + 1}: ${text.slice(0, 60)}${text.length > 60 ? "…" : ""}` : `Test A${i + 1}`;
+  const logs = S.data.logs.filter(l => l.sec === p.id && l.ref === ref).length, probs = S.data.issues.filter(x => x.sec === p.id && x.ref === ref && x.state === "open").length;
+  return `<div class="step" data-v="${v}"><div class="marker">${v === "done" || v === "pass" ? icon("check", "sm") : v === "blocked" || v === "fail" ? icon("x", "sm") : kind === "s" ? i + 1 : "A" + (i + 1)}</div>
+  <div class="body"><div>${esc(text)}</div>${canWrite() ? `<div class="tools"><button class="btn ghost" data-act="inline" data-k="${key}-log">${icon("log", "sm")}Log what I did${logs ? ` (${logs})` : ""}</button><button class="btn ghost" data-act="inline" data-k="${key}-iss">${icon("alert", "sm")}Report a problem${probs ? ` (${probs} open)` : ""}</button></div>` : ""}</div>
+  <div class="stctlwrap">${sel(key, kind === "s" ? STEP_OPTS : TEST_OPTS)}</div>
+  ${S.inline === key + "-log" ? `<div class="inline">${inlineLog(p.id, ref, key)}</div>` : S.inline === key + "-iss" ? `<div class="inline">${inlineIssue(p.id, ref, key)}</div>` : ""}</div>`;
+}
 function vPB(p) {
   const pr = pbProgress(p), refs = [...p.steps.map((s, i) => `Step ${i + 1}: ${s.slice(0, 60)}${s.length > 60 ? "…" : ""}`), ...p.tests.map((t, i) => `Test A${i + 1}`), "General"];
-  return `<div class="eyebrow">Playbook ${p.no} · Workstream ${p.ws}</div><h1>${esc(p.title)}</h1>
-  <dl class="meta"><div><dt>Objective</dt><dd>${esc(p.obj)}</dd></div><div><dt>Owner</dt><dd>${esc(p.owner)}</dd></div><div><dt>Prerequisites</dt><dd>${esc(p.pre)}</dd></div></dl>
-  ${p.note ? `<div class="box warn"><b>Before you start</b>${esc(p.note)}</div>` : ""}
-  <div class="acts" style="margin:6px 0 4px"><div style="flex:1;min-width:160px">${bar(pr)}</div><span class="muted" style="font-size:13px">${pr.d} of ${pr.n} steps done${pr.b ? `, ${pr.b} blocked` : ""}</span></div>
-  <h2>Procedure</h2><div class="list">${p.steps.map((s, i) => `<div class="row"><div class="num">${String(i + 1).padStart(2, "0")}</div><div class="txt">${esc(s)}</div><div>${sel(`${p.id}-s${i + 1}`, STEP_OPTS)}</div></div>`).join("")}</div>
-  <h2>Acceptance tests</h2><div class="list">${p.tests.map((t, i) => `<div class="row"><div class="num">A${i + 1}</div><div class="txt">${esc(t)}</div><div>${sel(`${p.id}-t${i + 1}`, TEST_OPTS)}</div></div>`).join("")}</div>
-  ${p.avoid ? `<h3>Avoid</h3><div class="avoid">${esc(p.avoid)}</div>` : ""}
-  ${kbPanel(p.id)}
-  ${p.kpis.length ? `<h2>Is it delivering?</h2><div class="grid2">${p.kpis.map(id => kpiCard(KPIS.find(k => k.id === id))).join("")}</div>` : ""}
-  ${logBlock(p.id, refs)}${issueBlock(p.id, refs)}${commentsBlock(p.id)}`;
+  const tab = (S.pbTab ||= {})[p.id] || "steps";
+  const kb = S.data.kb.filter(k => (k.pbs || []).includes(p.id));
+  const openP = S.data.issues.filter(x => x.sec === p.id && x.state === "open").length, nLog = S.data.logs.filter(l => l.sec === p.id).length, nCom = S.data.comments.filter(c => c.sec === p.id).length;
+  const T = [["steps", "Steps", pr.n, false], ["guidance", "Vendor guidance", kb.length, false], ...(p.kpis.length ? [["results", "Results", p.kpis.length, false]] : []), ["problems", "Problems", openP, openP > 0], ["log", "Implemented", nLog, false], ["discuss", "Discussion", nCom, false]];
+  const i = PB.indexOf(p), prev = PB[i - 1], next = PB[i + 1];
+  let body = "";
+  if (tab === "steps") body = `${p.note ? `<div class="box warn"><b>Before you start</b>${esc(p.note)}</div>` : ""}<div class="box info"><b>Prerequisites</b>${esc(p.pre)}</div>
+    <div class="steps">${p.steps.map((s, k) => stepCard(p, "s", k, s)).join("")}</div>
+    <h2>${icon("check")} Acceptance tests</h2><div class="steps">${p.tests.map((t, k) => stepCard(p, "t", k, t)).join("")}</div>
+    ${p.avoid ? `<h2>${icon("alert")} Avoid</h2><div class="avoid">${esc(p.avoid)}</div>` : ""}`;
+  else if (tab === "guidance") body = kbPanel(p.id) || `<div class="empty">${icon("bulb")}No knowledge-base articles linked to this playbook yet.</div>`;
+  else if (tab === "results") body = `<div class="grid2">${p.kpis.map(id => kpiCard(KPIS.find(k => k.id === id))).join("")}</div>`;
+  else if (tab === "problems") body = issueBlock(p.id, refs);
+  else if (tab === "log") body = logBlock(p.id, refs);
+  else body = commentsBlock(p.id);
+  return `<div class="eyebrow"><a href="#playbooks">Playbooks</a> · Workstream ${p.ws}</div>
+  <div class="pbhead" style="margin-top:8px"><span class="pbno">${p.no}</span><h1>${esc(p.title)}</h1><div style="margin-left:auto">${ring(pr.d / pr.n * 100, 58)}</div></div>
+  <p class="lede">${esc(p.obj)}</p>
+  <div class="ownerchips">${p.owner.split(/[;+]/).map(o => o.trim()).filter(Boolean).map(o => `<span class="pill">${icon("user", "sm")}${esc(o.replace(/\(proposed, confirm\)/, "").trim())}</span>`).join("")}${/confirm/.test(p.owner) ? `<span class="pill warn">owners to confirm</span>` : ""}</div>
+  <div class="tabs" role="tablist">${T.map(([k, l, n, hot]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? "on" : ""}" data-act="pbtab" data-pb="${p.id}" data-tab="${k}">${l}${n ? ` <span class="count${hot ? " hot" : ""}">${n}</span>` : ""}</button>`).join("")}</div>
+  ${body}
+  <div class="pbnav">${prev ? `<a class="card" href="#${prev.id}"><small>${icon("back", "sm")} Previous</small>${prev.no} ${esc(prev.title)}</a>` : "<span></span>"}${next ? `<a class="card" href="#${next.id}" style="text-align:right"><small>Next ${icon("chev", "sm")}</small>${next.no} ${esc(next.title)}</a>` : ""}</div>`;
 }
 function vQA() {
   return `<div class="eyebrow">Prove it works</div><h1>QA test cases</h1><p class="muted">Run each scenario on staging and record the outcome.</p>
@@ -433,13 +493,15 @@ function vSystem(id) {
 
 // ---------- views: knowledge base ----------
 function vKB() {
-  const stale = S.data.kb.filter(k => k.review_flag || !k.verified_on || (Date.now() - new Date(k.verified_on)) / 864e5 > 90);
-  const groups = {}; S.data.kb.forEach(k => { (groups[k.system] ??= []).push(k); });
-  return `<div class="eyebrow">Knowledge base</div><h1>Current vendor guidance</h1>
-  <p class="muted">Step-by-step guidance for each platform, with sources and the date it was last checked. Articles older than 90 days are marked for review. When vendor docs change, edit the article and mark it verified.</p>
-  <div class="acts">${canWrite() ? `<a class="btn primary" href="#kb-new">New article</a>` : ""}<button class="btn" data-act="stale">Show what needs re-checking (${stale.length})</button></div>
-  ${S.showStale ? `<div class="box warn" style="margin-top:12px"><b>${stale.length} article${stale.length === 1 ? "" : "s"} to re-check</b>${stale.length ? `<ul style="margin:6px 0 0;padding-left:18px">${stale.map(k => `<li><a href="#kb-${k.id}">${esc(k.title)}</a>: ${k.review_flag ? "flagged" + (k.review_note ? ` (${esc(k.review_note)})` : "") : !k.verified_on ? "never verified" : "verified " + fmtD(k.verified_on)}. Sources: ${(k.sources || []).map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>`).join(", ")}</li>`).join("")}</ul>` : "All articles verified within 90 days."}</div>` : ""}
-  ${Object.entries(groups).sort((a, b) => sysName(a[0]).localeCompare(sysName(b[0]))).map(([sys, arts]) => `<h2>${esc(sysName(sys))}</h2><div class="feed">${arts.map(k => `<a class="entry" href="#kb-${k.id}" style="text-decoration:none;color:inherit;display:block"><div class="h"><b>${esc(k.title)}</b>${kbBadge(k)}</div><p class="muted">${esc(k.summary.slice(0, 220))}${k.summary.length > 220 ? "…" : ""}</p></a>`).join("")}</div>`).join("")}`;
+  const stale = k => k.review_flag || !k.verified_on || (Date.now() - new Date(k.verified_on)) / 864e5 > 90;
+  const f = S.kbF || "all";
+  const FIL = [["all", "All"], ["platform", "Platform guidance"], ["export", "Export guides"], ["native", "Native integrations"], ["stale", "Needs re-check"]];
+  const list = S.data.kb.filter(k => f === "all" || (f === "export" ? k.id.startsWith("export-") : f === "native" ? k.system === "native" : f === "stale" ? stale(k) : !k.id.startsWith("export-") && k.system !== "native"));
+  return `<div class="eyebrow">Knowledge</div><h1>Vendor guidance</h1>
+  <p class="lede">How each platform works today, how to export its setup, and which built-in connections to use. Every article shows its sources and when it was last checked.</p>
+  <div class="filters"><div class="seg-tabs">${FIL.map(([k, l]) => `<button data-act="kbf" data-f="${k}" class="${k === f ? "on" : ""}">${l}${k === "stale" ? ` (${S.data.kb.filter(stale).length})` : ""}</button>`).join("")}</div>${canWrite() ? `<a class="btn primary" href="#kb-new" style="margin-left:auto">${icon("plus", "sm")}New article</a>` : ""}</div>
+  ${f === "stale" ? `<div class="box warn"><b>How to re-check</b>Open each article, follow its source links, update anything that changed, then click "mark verified today".</div>` : ""}
+  <div class="kbgrid">${list.map(k => `<a class="card kbcard" href="#kb-${k.id}"><span class="sys">${esc(sysName(k.system))}</span><b>${esc(k.title)}</b><p>${esc(k.summary)}</p><div style="margin-top:auto">${kbBadge(k)}</div></a>`).join("") || `<div class="empty">${icon("bulb")}Nothing here.</div>`}</div>`;
 }
 function vKBArticle(id) {
   const k = S.data.kb.find(x => x.id === id); if (!k) return `<h1>Article not found</h1><p><a href="#kb">Knowledge base</a></p>`;
@@ -587,7 +649,7 @@ function vImport() {
    <div class="two"><label for="imsys">System<select id="imsys" data-imp="system">${SYSTEMS.map(s => `<option value="${s.id}" ${s.id === m.system ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
    <label for="imfmt">What you are pasting<select id="imfmt" data-imp="format"><option value="list" ${m.format === "list" ? "selected" : ""}>Copied list or field layout (one per line)</option><option value="csv" ${m.format === "csv" ? "selected" : ""}>CSV with a header row</option><option value="gtm" ${m.format === "gtm" ? "selected" : ""}>GTM container export (JSON)</option><option value="freshsales" ${m.format === "freshsales" ? "selected" : ""}>Freshsales fields API (JSON)</option></select></label></div>
    <div class="box info" style="margin:0"><b>Where to get it from ${esc(sysName(m.system))}</b>${esc(HOWTO[m.system] || "Copy the list of names from the tool's settings, one per line.")}${S.data.kb.some(k => k.id === "export-" + m.system) ? ` <a href="#kb-export-${m.system}">Step-by-step export guide</a>` : ""}</div>
-   <div class="two"><label for="imcont">Container, module or property (keeps re-imports separate)<input id="imcont" data-imp="container" value="${esc(m.container)}" placeholder="e.g. Contacts, Deals, GTM-N9XFQZMK"></label>
+   <div class="two"><label for="imcont">Which part of ${esc(sysName(m.system))} is this list from?<input id="imcont" data-imp="container" value="${esc(m.container)}" placeholder="${esc({ freshsales: "e.g. Contacts, Accounts, Deals", gtm: "e.g. GTM-N9XFQZMK (filled in from the export)", ga4: "e.g. the GA4 property name or ID", firebase: "e.g. the Firebase project or app stream", zuper: "e.g. Jobs, Customers", respond: "e.g. Contact fields, Webhooks", meta: "e.g. the dataset (pixel) name", tiktok: "e.g. the pixel name", gads: "e.g. the Google Ads account name" }[m.system] || "e.g. the module, property or account name")}"><span style="font-size:12px">Keeps each list separate, so re-importing Contacts never touches Deals.</span></label>
    <label for="imkind">Type for every item (GTM export sets its own)<input id="imkind" data-imp="kind" list="imkl" value="${esc(m.kind)}"><datalist id="imkl">${(SYS[m.system]?.kinds || []).map(k => `<option value="${esc(k)}">`).join("")}</datalist></label></div>
    <div class="two"><label for="imst">Status<select id="imst" data-imp="state"><option value="live" ${m.state === "live" ? "selected" : ""}>Live (set up today)</option><option value="planned" ${m.state === "planned" ? "selected" : ""}>Planned</option></select></label>
    <label style="display:flex;gap:8px;align-items:center;color:var(--fg);align-self:end"><input type="checkbox" data-imp="fixed" ${m.fixed ? "checked" : ""} style="width:auto"> Names can't be renamed in this system (for example Freshsales field keys)</label></div>
@@ -649,15 +711,42 @@ document.addEventListener("click", async e => {
 });
 
 // ---------- shell ----------
-const NAV = () => [
-  ["Start", [["overview", "Programme overview"], ["read", "Read this first"], ["gates", "Gates G0–G6"], ["ws", "Workstreams"]]],
-  ["Playbooks", PB.map(p => [p.id, p.no + " " + p.title])],
-  ["Data and tracking", [["registry", "Tracking registry"], ["consistency", "Consistency check", S.A.problems], ["flow", "Data flow"], ["import", "Import current setup"], ["add", "Add one item"]]],
-  ["Knowledge base", [["kb", "Vendor guidance"]]],
-  ["Prove it works", [["qa", "QA test cases"], ["results", "Results & KPIs"], ["log", "Implementation log"], ["issues", "Problems and fixes", S.data.issues.filter(x => x.state === "open").length]]],
-  ["Reference", [["ref", "Schema and naming rules"], ["day1", "Day-one tasks"], ["esc", "Escalation & cadence"], ["approval", "Final approval checklist"]]],
-  ...(isAdmin() ? [["Admin", [["admin", "People and access"], ["activity", "Activity"]]]] : [])];
-const VIEWS = { overview: vOverview, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity };
+const AREAS = [
+  { id: "home", label: "Home", icon: "home", href: "#overview" },
+  { id: "plan", label: "Playbooks", icon: "book", href: "#playbooks" },
+  { id: "track", label: "Tracking", icon: "radar", href: "#registry" },
+  { id: "kb", label: "Knowledge", icon: "bulb", href: "#kb" },
+  { id: "results", label: "Results", icon: "chart", href: "#results" }];
+function areaOf(h) {
+  if (!h || h === "overview") return "home";
+  if (["playbooks", "read", "gates", "ws", "qa", "approval", "day1", "esc"].includes(h) || PB.some(p => p.id === h)) return "plan";
+  if (["registry", "consistency", "flow", "import", "add"].includes(h) || h.startsWith("f-") || h.startsWith("sys-")) return "track";
+  if (h === "kb" || h.startsWith("kb-") || h === "ref") return "kb";
+  if (["results", "log", "issues"].includes(h)) return "results";
+  if (["admin", "activity", "password"].includes(h)) return "admin";
+  return "home";
+}
+function subnav(area) {
+  const openI = S.data.issues.filter(x => x.state === "open").length;
+  if (area === "plan") return [["Start", [["playbooks", "All playbooks"], ["read", "Read this first"], ["gates", "Gates G0–G6"], ["ws", "Workstreams"]]],
+    ["Playbooks", PB.map(p => [p.id, p.title, p])], ["Checks", [["qa", "QA test cases"], ["approval", "Final approval"], ["day1", "Day-one tasks"], ["esc", "Escalation & cadence"]]]];
+  if (area === "track") return [["Tracking", [["registry", "Registry"], ["consistency", "Consistency check", null, S.A.problems], ["flow", "Data flow"], ["import", "Import current setup"], ["add", "Add one item"]]]];
+  if (area === "kb") return [["Knowledge", [["kb", "Vendor guidance"], ["ref", "Schema & naming rules"]]]];
+  if (area === "results") return [["Results", [["results", "Results & KPIs"], ["issues", "Problems and fixes", null, openI], ["log", "Implementation log"]]]];
+  if (area === "admin") return [["Admin", [["admin", "People and access"], ["activity", "Activity"], ["password", "Change password"]]]];
+  return [["Shortcuts", [["playbooks", "All playbooks"], ["registry", "Tracking registry"], ["issues", "Problems and fixes", null, openI], ["import", "Import current setup"]]]];
+}
+function titleOf(h) {
+  const p = PB.find(x => x.id === h); if (p) return p.no + " " + p.title;
+  if (h.startsWith("f-")) return S.data.fields.find(f => f.id === h.slice(2))?.name || "Field";
+  if (h.startsWith("sys-")) return SYS[h.slice(4)]?.name || "System";
+  if (h.startsWith("kb-edit-") || h === "kb-new") return "Edit article";
+  if (h.startsWith("kb-")) return S.data.kb.find(k => k.id === h.slice(3))?.title || "Article";
+  return { overview: "Home", playbooks: "All playbooks", read: "Read this first", gates: "Gates", ws: "Workstreams", qa: "QA test cases", approval: "Final approval", day1: "Day-one tasks", esc: "Escalation & cadence",
+    registry: "Tracking registry", consistency: "Consistency check", flow: "Data flow", import: "Import current setup", add: "Add one item", kb: "Vendor guidance", ref: "Schema & naming rules",
+    results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
+}
+const VIEWS = { overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity };
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (S.me?.must_change) return () => vPassword(true);
@@ -670,20 +759,37 @@ function route() {
   if (h.startsWith("kb-")) return () => vKBArticle(h.slice(3));
   return vOverview;
 }
-const curKey = () => location.hash.slice(1) || "overview";
+const curKey = () => decodeURIComponent(location.hash.slice(1)) || "overview";
+const initials = n => (n || "?").split(/\s+/).map(s => s[0]).slice(0, 2).join("").toUpperCase();
 function shell() {
-  $("#root").innerHTML = `<header class="top"><div class="brand"><b>MarTech Programme</b><span>Wetility · Implementation guide</span></div>
-  <div class="search"><input id="gq" type="search" placeholder="Search events, tags, variables, fields, guidance" aria-label="Search" value="${esc(S.q)}"></div>
-  <div class="who"><span class="dot" aria-hidden="true">${esc((S.me.name || "?").split(/\s+/).map(s => s[0]).slice(0, 2).join("").toUpperCase())}</span><span>${esc(S.me.name)} <span style="color:#AFC0D8">(${esc(S.me.role)})</span></span>
-  <label for="iam" style="color:#AFC0D8">My sections</label><select id="iam"><option value="">Everyone</option>${PEOPLE.map(n => `<option ${n === filterMe ? "selected" : ""}>${n}</option>`).join("")}</select>
-  <button data-act="pw">Password</button><button data-act="logout">Sign out</button></div></header>
-  <div class="shell"><nav class="rail" id="rail" aria-label="Sections"></nav><main><div class="wrap"><div class="picker"><label for="pick" class="muted" style="font-size:12px">Section</label><select id="pick"></select></div><div id="view"></div></div></main></div>`;
+  $("#root").innerHTML = `<div class="app"><aside class="side" aria-label="Main navigation">
+   <a class="logo" href="#overview" aria-label="Wetility MarTech Programme home"><img src="/logo-yellow.png" alt="Wetility"><span>MarTech Programme</span></a>
+   <nav class="navmain" id="navmain"></nav><nav class="subnav" id="subnav" aria-label="Section"></nav>
+   </aside>
+  <div class="main"><header class="topbar"><nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+   <button class="searchbtn" data-act="cmdk" aria-label="Search">${icon("search", "sm")}<span>Search events, fields, guidance</span><kbd>Ctrl K</kbd></button>
+   <div class="menuwrap"><button class="avatar" data-act="menu" aria-haspopup="true" aria-label="Account menu">${esc(initials(S.me.name))}</button><div id="menu"></div></div></header>
+   <main class="content"><div class="wrap"><nav class="mobsub" id="mobsub" aria-label="Section"></nav><div id="banner"></div><div id="view"></div></div></main></div></div>
+  <nav class="bottomnav" id="bottomnav" aria-label="Main"></nav>`;
 }
 function renderNav() {
-  const c = curKey(), nav = NAV();
-  $("#rail").innerHTML = nav.map(([h, items]) => `<h4>${h}</h4>` + items.map(([id, l, n]) => { const p = PB.find(x => x.id === id), pr = p ? pbProgress(p) : null;
-    return `<a href="#${id}" class="${id === c ? "on" : ""}">${p && isMine(p.owner) ? `<span class="mine" title="Your section"></span>` : ""}<span style="flex:1;min-width:0">${esc(l)}</span>${pr ? `<small>${pr.d}/${pr.n}</small>` : n ? `<small class="sev-high">${n}</small>` : ""}</a>`; }).join("")).join("");
-  $("#pick").innerHTML = nav.map(([h, items]) => `<optgroup label="${h}">${items.map(([id, l]) => `<option value="${id}" ${id === c ? "selected" : ""}>${esc(l)}</option>`).join("")}</optgroup>`).join("");
+  const c = curKey(), area = areaOf(c), openI = S.data.issues.filter(x => x.state === "open").length;
+  const areas = [...AREAS, ...(isAdmin() ? [{ id: "admin", label: "Admin", icon: "shield", href: "#admin" }] : [])];
+  $("#navmain").innerHTML = areas.map(a => `<a href="${a.href}" class="${a.id === area ? "on" : ""}">${icon(a.icon)}<span>${a.label}</span>${a.id === "results" && openI ? `<span class="badge">${openI}</span>` : a.id === "track" && (S.A.privacy.length + S.A.dups.length) ? `<span class="badge" title="Privacy conflicts and duplicates">${S.A.privacy.length + S.A.dups.length}</span>` : ""}</a>`).join("");
+  const groups = subnav(area);
+  $("#subnav").innerHTML = groups.map(([h, items]) => `<h5>${h}</h5>` + items.map(([id, l, p, n]) => { const pr = p ? pbProgress(p) : null;
+    return `<a href="#${id}" class="${id === c ? "on" : ""}">${p ? `<span class="no">${p.no}</span>` : ""}<span class="t">${esc(l)}</span>${p && isMine(p.owner) ? `<span class="mine" title="Yours"></span>` : ""}${pr ? `<span class="no" style="width:auto">${pr.d}/${pr.n}</span>` : n ? `<span class="badge">${n}</span>` : ""}</a>`; }).join("")).join("");
+  $("#mobsub").innerHTML = area === "home" ? "" : groups.flatMap(([, items]) => items).filter(([id, , p]) => !p).map(([id, l]) => `<a href="#${id}" class="${id === c ? "on" : ""}">${esc(l)}</a>`).join("");
+  $("#bottomnav").innerHTML = AREAS.map(a => `<a href="${a.href}" class="${a.id === area ? "on" : ""}">${icon(a.icon, "lg")}<span>${a.label}</span>${a.id === "results" && openI ? `<span class="badge">${openI}</span>` : ""}</a>`).join("");
+  const A2 = areas.find(a => a.id === area);
+  $("#crumbs").innerHTML = area === "home" && c === "overview" ? `<b>Home</b>` : `<a href="${A2?.href || "#overview"}">${A2?.label || "Home"}</a>${icon("chev")}<b>${esc(titleOf(c))}</b>`;
+  document.title = titleOf(c) + " · Wetility MarTech";
+}
+function renderMenu() {
+  $("#menu").innerHTML = S.menu ? `<div class="menu" role="menu"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.email)} · ${esc(S.me.role)}</span></div>
+   <label class="mi" for="iam">${icon("user", "sm")}My sections<select id="iam"><option value="">Everyone</option>${PEOPLE.map(n => `<option ${n === filterMe ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+   ${isAdmin() ? `<button data-act="go" data-h="admin">${icon("shield", "sm")}People and access</button>` : ""}
+   <button data-act="pw">${icon("key", "sm")}Change password</button><button data-act="logout">${icon("logout", "sm")}Sign out</button></div>` : "";
 }
 let deferred = false;
 function render(keep) {
@@ -702,16 +808,55 @@ async function refresh() { await load(); render(true); }
 
 // ---------- login ----------
 function loginScreen(msg) {
-  $("#root").innerHTML = `<div class="login"><form id="login"><div class="eyebrow">Wetility</div><h1>MarTech Programme</h1><p class="muted" style="margin:0">Implementation guide, tracking registry and vendor guidance.</p>
+  $("#root").innerHTML = `<div class="login"><div class="art"><img class="bolt" src="/bolt-black.png" alt="Wetility"><div><span class="brandname">Wetility · MarTech Programme</span><h2>Every signal, owned and accounted for.</h2><p>The implementation guide, tracking registry and vendor guidance for Wetility's MarTech programme.</p>
+   <ul><li>${icon("book")}Playbooks with step-by-step status</li><li>${icon("radar")}One registry for every event, tag and field</li><li>${icon("bulb")}Current guidance for every platform</li></ul></div><span></span></div>
+  <div class="pane"><form id="login"><div class="eyebrow">Sign in</div><h1>Welcome back</h1>
   <label for="le">Email<input id="le" name="email" type="email" required autocomplete="username"></label><label for="lp">Password<input id="lp" name="password" type="password" required autocomplete="current-password"></label>
-  <div class="err" id="lerr">${esc(msg || "")}</div><button class="btn primary" type="submit">Sign in</button><p class="muted" style="font-size:12.5px;margin:0">No account? Ask Franta or another admin to add you.</p></form></div>`;
+  <div class="err" id="lerr">${esc(msg || "")}</div><button class="btn primary" type="submit">Sign in</button><p class="muted" style="font-size:12.5px;margin:0">No account yet? Ask Franta or another admin to add you.</p></form></div></div>`;
   $("#login").addEventListener("submit", async e => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const b = e.target.querySelector("button"); b.disabled = true;
     try { await api("POST", "/api/login", d); await start(); } catch (err) { $("#lerr").textContent = err.message; b.disabled = false; } });
 }
-
+// ---------- search palette ----------
+function cmdkResults(q) {
+  const qy = norm(q), raw = q.trim().toLowerCase(), out = [];
+  const hit = x => x && (norm(x).includes(qy) || String(x).toLowerCase().includes(raw));
+  const pages = [["overview", "Home", "home"], ["playbooks", "All playbooks", "book"], ["registry", "Tracking registry", "table"], ["consistency", "Consistency check", "radar"], ["flow", "Data flow", "flow"], ["import", "Import current setup", "upload"], ["kb", "Vendor guidance", "bulb"], ["results", "Results & KPIs", "chart"], ["issues", "Problems and fixes", "alert"], ["log", "Implementation log", "log"], ["gates", "Gates G0–G6", "gate"], ["read", "Read this first", "alert"]];
+  if (!qy) return [{ g: "Go to", items: pages.map(([h, t, i]) => ({ href: "#" + h, t, i })) }];
+  const push = (g, arr) => { if (arr.length) out.push({ g, items: arr.slice(0, 6) }); };
+  push("Pages", pages.filter(([, t]) => hit(t)).map(([h, t, i]) => ({ href: "#" + h, t, i })));
+  push("Playbooks", PB.filter(p => hit(p.title) || hit(p.no)).map(p => ({ href: "#" + p.id, t: p.no + " " + p.title, i: "book" })));
+  push("Standard fields", S.data.fields.filter(f => [f.name, f.description, ...(f.aliases || [])].some(hit)).map(f => ({ href: "#f-" + f.id, t: f.name, s: f.description, i: "target" })));
+  push("In systems", S.data.impls.filter(i => [i.name, i.label, i.container, i.parent].some(hit)).map(i => { const f = S.A.fieldOf(i.field_id); return { href: f ? "#f-" + f.id : "#sys-" + i.system, t: i.label || i.name, s: `${sysName(i.system)} ${i.kind}${i.container ? " · " + i.container : ""}${f ? " → " + f.name : " · not mapped"}`, i: "table" }; }));
+  push("Guidance", S.data.kb.filter(k => [k.title, k.summary].some(hit)).map(k => ({ href: "#kb-" + k.id, t: k.title, s: sysName(k.system), i: "bulb" })));
+  const st2 = []; PB.forEach(p => p.steps.forEach((s, i) => { if (hit(s)) st2.push({ href: "#" + p.id, t: `${p.no} step ${i + 1}`, s, i: "check" }); })); push("Steps", st2);
+  push("Problems", S.data.issues.filter(x => [x.title, x.detail, x.resolution].some(hit)).map(x => ({ href: "#issues", t: x.title, s: x.state, i: "alert" })));
+  return out;
+}
+function openCmdk() {
+  S.cmd = { q: "", sel: 0 };
+  let el = $("#cmdk"); if (!el) { el = document.createElement("div"); el.id = "cmdk"; document.body.appendChild(el); }
+  el.innerHTML = `<div class="cmdk" data-act="cmdk-close"><div class="box2" role="dialog" aria-label="Search"><div class="in">${icon("search")}<input id="cmdq" placeholder="Search events, GTM tags, fields, guidance, steps…" autocomplete="off"><kbd>Esc</kbd></div><div class="res2" id="cmdres"></div><div class="hint"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><a href="#search" data-act="cmdk-all">See all results</a></span></div></div></div>`;
+  drawCmdk(); $("#cmdq").focus();
+}
+function drawCmdk() {
+  const groups = cmdkResults(S.cmd.q); let n = 0;
+  const flat = groups.flatMap(g => g.items); S.cmd.flat = flat; S.cmd.sel = Math.min(S.cmd.sel, Math.max(0, flat.length - 1));
+  $("#cmdres").innerHTML = flat.length ? groups.map(g => `<div class="grp">${esc(g.g)}</div>` + g.items.map(it => { const k = n++; return `<a class="opt${k === S.cmd.sel ? " sel" : ""}" href="${it.href}" data-k="${k}">${icon(it.i)}<span><b>${esc(it.t)}</b>${it.s ? `<small>${esc(it.s)}</small>` : ""}</span></a>`; }).join("")).join("")
+    : `<div class="empty" style="margin:10px">${icon("search")}Nothing found. If it is new, <a href="#add">add it to the registry</a>.</div>`;
+}
+function closeCmdk() { const el = $("#cmdk"); if (el) el.innerHTML = ""; S.cmd = null; }
+document.addEventListener("keydown", e => {
+  const typing = /input|textarea|select/i.test(document.activeElement?.tagName || "");
+  if ((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing && !S.cmd)) { if (S.data) { e.preventDefault(); openCmdk(); } return; }
+  if (!S.cmd) { if (e.key === "Escape" && S.menu) { S.menu = false; renderMenu(); } return; }
+  if (e.key === "Escape") { closeCmdk(); }
+  else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); S.cmd.sel = (S.cmd.sel + (e.key === "ArrowDown" ? 1 : -1) + S.cmd.flat.length) % Math.max(1, S.cmd.flat.length); drawCmdk(); $("#cmdres .opt.sel")?.scrollIntoView({ block: "nearest" }); }
+  else if (e.key === "Enter") { const it = S.cmd.flat[S.cmd.sel]; if (it) { e.preventDefault(); location.hash = it.href.slice(1); closeCmdk(); } }
+});
+document.addEventListener("input", e => { if (e.target.id === "cmdq") { S.cmd.q = e.target.value; S.q = e.target.value; S.cmd.sel = 0; drawCmdk(); } });
 // ---------- events ----------
 document.addEventListener("focusout", () => { if (deferred) setTimeout(() => { const ae = document.activeElement; if (!(ae && ae.closest && ae.closest("#view form.f"))) { deferred = false; render(true); } }, 0); });
-addEventListener("hashchange", () => { if (S.data) { render(); scrollTo(0, 0); } });
+addEventListener("hashchange", () => { closeCmdk(); S.menu = false; S.inline = null; if (S.data) { renderMenu(); render(); scrollTo(0, 0); } });
 document.addEventListener("input", e => {
   if (e.target.id === "gq") { clearTimeout(S._qt); S._qt = setTimeout(() => { S.q = e.target.value; if (curKey() !== "search") location.hash = "search"; else render(true); }, 200); }
   if (e.target.id === "regq") { clearTimeout(S._rt); S._rt = setTimeout(() => { S.regQ = e.target.value; const pos = e.target.selectionStart; render(); const el = $("#regq"); el.focus(); el.setSelectionRange(pos, pos); }, 200); }
@@ -719,7 +864,7 @@ document.addEventListener("input", e => {
 document.addEventListener("change", async e => {
   const el = e.target;
   if (el.id === "pick") { location.hash = el.value; return; }
-  if (el.id === "iam") { filterMe = el.value || null; try { filterMe ? localStorage.setItem("mt_me", filterMe) : localStorage.removeItem("mt_me"); } catch (_) {} renderNav(); return; }
+  if (el.id === "iam" || el.dataset.focus) { filterMe = el.value || null; try { filterMe ? localStorage.setItem("mt_me", filterMe) : localStorage.removeItem("mt_me"); } catch (_) {} render(true); return; }
   if (el.id === "iflt") { S.flag = el.value; render(); return; }
   if (el.id === "regkind") { S.regKind = el.value; render(); return; }
   if (el.id === "regprob") { S.regProb = el.value; render(); return; }
@@ -755,19 +900,31 @@ document.addEventListener("submit", async e => {
       case "invite": { const r = await api("POST", "/api/users", d); S.tempPw = { email: r.email, pw: r.tempPassword }; S.users = null; f.reset(); render(true); return; }
       case "password": await api("POST", "/api/password", d); toast("Password saved"); S.me.must_change = false; await load(); location.hash = "overview"; render(); return;
     }
+    if (f.classList.contains("inline")) S.inline = null;
     f.reset(); await refresh();
   } catch (err) { toast(err.message); } finally { b.disabled = false; }
 });
 document.addEventListener("click", async e => {
+  if (S.menu && !e.target.closest(".menuwrap")) { S.menu = false; renderMenu(); }
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act, id = b.dataset.id;
   if (act === "prefill") { S.prefSys = b.dataset.sys || null; S.prefField = b.dataset.field || null; return; }
+  if (act === "cmdk") { openCmdk(); return; }
+  if (act === "cmdk-close") { if (e.target.classList.contains("cmdk")) closeCmdk(); return; }
+  if (act === "cmdk-all") { closeCmdk(); return; }
+  if (act === "menu") { S.menu = !S.menu; renderMenu(); return; }
+  if (act === "go") { S.menu = false; renderMenu(); location.hash = b.dataset.h; return; }
+  if (act === "pbtab") { S.pbTab[b.dataset.pb] = b.dataset.tab; S.inline = null; render(true); return; }
+  if (act === "inline") { S.inline = S.inline === b.dataset.k ? null : b.dataset.k || null; render(true); setTimeout(() => document.querySelector("#view .inline input:not([type=hidden]), #view .inline textarea")?.focus(), 0); return; }
+  if (act === "kbf") { S.kbF = b.dataset.f; render(true); return; }
+  if (act === "set-state") { if (!canWrite()) return; const key = b.dataset.key, v = b.dataset.v; S.statusMap[key] = { ...(S.statusMap[key] || {}), state: v, by_user: S.me.id, at: new Date().toISOString() }; render(true);
+    try { await api("POST", "/api/status", { key, state: v }); toast({ done: "Marked done", pass: "Marked passed", fail: "Marked failed", blocked: "Marked blocked", progress: "In progress", approved: "Approved", todo: "Status cleared" }[v] || "Saved"); await refresh(); } catch (err) { toast(err.message); await refresh(); } return; }
   const confirmFirst = ["del-comments", "del-logs", "del-results", "del-impl", "user-del", "merge", "reset"];
   if (confirmFirst.includes(act) && !b.dataset.armed) { b.dataset.armed = "1"; const t = b.textContent; b.textContent = "Click again to confirm"; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = t; } }, 3500); return; }
   try {
     switch (act) {
       case "logout": await api("POST", "/api/logout"); location.hash = ""; return loginScreen("Signed out.");
-      case "pw": location.hash = "password"; return;
+      case "pw": S.menu = false; renderMenu(); location.hash = "password"; return;
       case "stale": S.showStale = !S.showStale; return render(true);
       case "copy-pw": try { await navigator.clipboard.writeText(S.tempPw.pw); toast("Copied"); } catch (_) { toast("Select the password and copy it"); } return;
       case "hide-pw": S.tempPw = null; return render(true);
