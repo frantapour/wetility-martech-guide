@@ -12,6 +12,7 @@ const { seedV5 } = require("./seed_v5");
 const { seedV6 } = require("./seed_v6");
 const { seedV7 } = require("./seed_v7");
 const { seedV8 } = require("./seed_v8");
+const { seedV9 } = require("./seed_v9");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -439,7 +440,7 @@ app.use((err, req, res, next) => {
   await seedV6();
   await seedV7();
   await seedV8();
-  await require("./diag")();
+  await seedV9();
   await ensureAdmin();
   app.listen(PORT, () => console.log(`MarTech guide listening on ${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });
