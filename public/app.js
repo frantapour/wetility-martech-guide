@@ -675,14 +675,14 @@ function impPreview() {
   const m = S.imp; m.result = null;
   let parsed;
   try {
-    parsed = m.format === "freshsales" ? Importer.parseFreshsales(m.text) : m.format === "gtm" ? Importer.parseGTM(m.text) : m.format === "csv" ? Importer.parseCSV(m.text) : Importer.parseList(m.text, { container: m.container, labelsAreNames: !["freshsales", "zuper", "respond", "credit"].includes(m.system) });
+    parsed = m.format === "freshsales" ? Importer.parseFreshsales(m.text) : m.format === "gtm" ? Importer.parseGTM(m.text) : m.format === "csv" ? Importer.parseCSV(m.text) : /active stages/i.test(m.text) && /lifecycle/i.test(m.text) ? Importer.parseStages(m.text) : Importer.parseList(m.text, { container: m.container, labelsAreNames: !["freshsales", "zuper", "respond", "credit"].includes(m.system) });
   } catch (e) { toast(e.message); return; }
   if (!parsed.items.length) { toast("Nothing recognisable to import. Check the format."); return; }
   if (!m.container && parsed.container) m.container = parsed.container;
   m.rows = parsed.items.map(it => { const s = Importer.suggest(it, S.data.fields); return { ...it, kind: it.kind || m.kind, on: true, field_id: s?.id || "", why: s ? "suggested: " + s.why : "" }; });
 }
 async function impSave() {
-  const m = S.imp, items = m.rows.filter(r => r.on).map(r => ({ system: m.system, container: m.container, kind: r.kind || m.kind, name: r.name, label: r.label || "", parent: r.parent || "", field_id: r.field_id || "", std: m.fixed, state: m.state, description: r.description || "" }));
+  const m = S.imp, items = m.rows.filter(r => r.on).map(r => ({ system: m.system, container: m.container, kind: r.kind || m.kind, name: r.name, label: r.label || "", parent: r.parent || "", field_id: r.field_id || "", std: m.fixed, state: r.state || m.state, description: r.description || "" }));
   const res = await api("POST", "/api/impls/bulk", { items });
   m.result = { ...res, names: new Set(items.map(i => i.name.toLowerCase())) };
   m.rows = null; m.text = "";

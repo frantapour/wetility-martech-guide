@@ -16,7 +16,7 @@ const SYNONYMS = {
   metaleadid: "meta_lead_id", leadgenid: "meta_lead_id", tiktokleadid: "tiktok_lead_id", freshsalescontactuid: "freshsales_contact_id", versofyuid: "versofy_uid",
   salesintentlevelscore: "intent_score", intentscore: "intent_score", idnumber: "sa_id_number", saidnumber: "sa_id_number", bankaccount: "bank_account",
   creditcheckconsent: "credit_check_consent", lifecyclestage: "lifecycle_stage", status: "lead_status", lostreason: "lost_reason",
-  referrercode: "referrer_code", meternumber: "meter_number", onebillmeternumber: "meter_number", productsdropdown: "product_interest",
+  referrercode: "referrer_code", creditcheck: "credit_assessed", qualified: "credit_qualified", meternumber: "meter_number", onebillmeternumber: "meter_number", productsdropdown: "product_interest",
   firstseenonchat: "chat_started", generatelead: "lead_submitted", leadsubmitted: "lead_submitted", lead: "lead_submitted", submitform: "lead_submitted",
   firstopen: "app_install", install: "app_install", appopen: "app_open", open: "app_open", eventid: "event_id", leadid: "lead_id", insertid: "event_id",
   clientid: "ga_client_id", appinstanceid: "app_instance_id", referringlink: "branch_referring_link", conversationid: "conversation_id", zuperjobid: "zuper_job_id"
@@ -55,6 +55,29 @@ function parseList(text, opts = {}) {
     items.push({ name: opts.labelsAreNames ? label : slug(label) || label, label, parent: [section, group].filter(Boolean).join(" / ") });
   }
   return { container, items };
+}
+
+// Freshsales > Contact Lifecycle Stages page: stages, their statuses, disabled stages and the stage rules.
+function parseStages(text) {
+  const raw = String(text || "").split(/\r?\n/);
+  const items = []; let mode = "", stage = null, gap = true;
+  for (let k = 0; k < raw.length; k++) {
+    const l = raw[k].trim();
+    if (/^disabled stages$/i.test(l)) { mode = "disabled"; gap = true; continue; }
+    if (/^active stages$/i.test(l)) { mode = "active"; gap = true; continue; }
+    if (/^rules for changing stages$/i.test(l)) { mode = "rules"; continue; }
+    if (!mode || /^add lifecycle stage$/i.test(l)) { gap = true; continue; }
+    if (!l) { gap = true; continue; }
+    if (mode === "rules") {
+      if (/^whenever/i.test(l)) { const target = (raw.slice(k + 1).find(x => x.trim()) || "").trim();
+        items.push({ kind: "workflow", name: slug(l + " " + target), label: `${l} ${target}`, parent: "Stage rules", description: "Automatic stage rule" }); }
+      continue;
+    }
+    if (gap) { stage = l; gap = false; items.push({ kind: "lifecycle stage", name: slug(l), label: l, parent: mode === "disabled" ? "Disabled stages" : "", state: mode === "disabled" ? "deprecated" : undefined }); continue; }
+    if (l === stage) continue;
+    items.push({ kind: "lifecycle status", name: slug(l), label: l, parent: stage, state: mode === "disabled" ? "deprecated" : undefined });
+  }
+  return { container: "Lifecycle stages", items };
 }
 
 // CSV with a header row. Recognised columns: name, label, type/kind, parent/group, description, container.
@@ -121,6 +144,6 @@ function parseFreshsales(text) {
   return { container: "", items };
 }
 
-const api = { norm, slug, suggest, parseList, parseCSV, parseGTM, parseFreshsales, SYNONYMS };
+const api = { norm, slug, suggest, parseList, parseStages, parseCSV, parseGTM, parseFreshsales, SYNONYMS };
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Importer = api;
 })(typeof window !== "undefined" ? window : globalThis);
