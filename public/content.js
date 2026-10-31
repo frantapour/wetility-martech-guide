@@ -94,7 +94,7 @@ window.SYSTEMS=[
  {id:"umbraco",name:"Umbraco website",short:"Website",layer:"Source",kinds:["form field","endpoint response","page"]},
  {id:"app",name:"Wetility App",short:"App",layer:"Source",kinds:["screen","in-app action","field"]},
  {id:"respond",name:"respond.io / WhatsApp",short:"respond.io",layer:"Source",kinds:["webhook event","contact field","workflow step","referral metadata"]},
- {id:"freshsales",name:"Freshsales CRM",short:"Freshsales",layer:"Source",kinds:["field","custom field","deal stage","workflow","integration"]},
+ {id:"freshsales",name:"Freshsales CRM",short:"Freshsales",layer:"Source",kinds:["field","custom field","deal stage","lifecycle stage","lifecycle status","product","module","workflow","integration"]},
  {id:"zuper",name:"Zuper",short:"Zuper",layer:"Source",kinds:["webhook event","field","job status"]},
  {id:"credit",name:"Credit system",short:"Credit",layer:"Source",kinds:["field","result"]},
  {id:"datalayer",name:"dataLayer",short:"dataLayer",layer:"Collection",kinds:["dataLayer event","dataLayer key"]},
