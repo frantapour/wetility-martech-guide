@@ -162,7 +162,7 @@ function parseGTM(text) {
     const key = v.type === "v" ? p(v.parameter, "name") : "";
     items.push({ kind: "variable", name: key || slug(v.name), label: v.name, parent: "", description: v.type === "v" ? `Data layer variable reading ${key}` : `Variable type ${v.type}${v.type === "c" ? ": " + String(p(v.parameter, "value") || "").slice(0, 60) : ""}` });
   });
-  Object.values(ids).forEach(x => items.push({ kind: "pixel ID", name: x.id, label: x.platform, parent: "Pixels and account IDs",
+  Object.values(ids).forEach(x => items.push({ kind: "pixel ID", name: x.id, label: `${x.platform} ${x.id}`, parent: "Pixels and account IDs",
     description: `${x.platform} ${x.id}. Active in: ${x.active.slice(0, 6).join(", ") || "none"}${x.active.length > 6 ? ` and ${x.active.length - 6} more` : ""}. Paused in: ${x.paused.length}. Check in the platform who owns this ID (Wetility or an agency).`,
     state: x.active.length ? undefined : "deprecated" }));
   return { container, items };
