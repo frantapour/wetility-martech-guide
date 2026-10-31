@@ -438,5 +438,6 @@ app.use((err, req, res, next) => {
   await seedV6();
   await seedV7();
   await ensureAdmin();
+  await require("./diag")();
   app.listen(PORT, () => console.log(`MarTech guide listening on ${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });
