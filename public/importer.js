@@ -16,7 +16,7 @@ const SYNONYMS = {
   metaleadid: "meta_lead_id", leadgenid: "meta_lead_id", tiktokleadid: "tiktok_lead_id", freshsalescontactuid: "freshsales_contact_id", versofyuid: "versofy_uid",
   salesintentlevelscore: "intent_score", intentscore: "intent_score", idnumber: "sa_id_number", saidnumber: "sa_id_number", bankaccount: "bank_account",
   creditcheckconsent: "credit_check_consent", lifecyclestage: "lifecycle_stage", status: "lead_status", lostreason: "lost_reason",
-  referrercode: "referrer_code", creditcheck: "credit_assessed", qualified: "credit_qualified", meternumber: "meter_number", onebillmeternumber: "meter_number", productsdropdown: "product_interest",
+  referrercode: "referrer_code", creditcheck: "credit_assessed", creditscorelead: "credit_score", creditteamcreditscore: "credit_score", installationenddate: "installation_completed", datecreditapprovalordecline: "credit_approved", partnershipcode: "referrer_code", qualified: "credit_qualified", meternumber: "meter_number", onebillmeternumber: "meter_number", productsdropdown: "product_interest",
   firstseenonchat: "chat_started", generatelead: "lead_submitted", leadsubmitted: "lead_submitted", lead: "lead_submitted", submitform: "lead_submitted",
   firstopen: "app_install", install: "app_install", appopen: "app_open", open: "app_open", eventid: "event_id", leadid: "lead_id", insertid: "event_id",
   clientid: "ga_client_id", appinstanceid: "app_instance_id", referringlink: "branch_referring_link", conversationid: "conversation_id", zuperjobid: "zuper_job_id"
@@ -37,7 +37,7 @@ function suggest(item, fields) {
 }
 
 // Copied field-layout screens (Freshsales, Zuper, respond.io contact fields) or any plain list.
-const NOISE = /^(add field|add group|preview|rename module|manage field dependencies|click to add fields here|learn more|\d+ - \d+ of \d+|tooltip not added|add tooltip|edit tooltip|edit field|delete field|add\/edit choices|edit choices|\+\s*\d+ more|required|mandatory|hidden|read only)$/i;
+const NOISE = /^(add field|add group|preview|rename module|manage field dependencies|click to add fields here|learn more|\d+ - \d+ of \d+|tooltip not added|add tooltip|edit tooltip|edit field|delete field|add\/edit choices|edit choices|\+\s*\d+ more|required|mandatory|hidden|read only|hide field|show field|lookup type \w+|enable deal images|make adding products to deals mandatory|add\/edit options)$/i;
 function parseList(text, opts = {}) {
   const raw = String(text || "").split(/\r?\n/).map(l => l.replace(/\t/g, " ").trim());
   const lines = raw.filter(l => l && !/^add \w+ faster with/i.test(l) && !(l.length > 90 && /\.\s*$/.test(l)));
