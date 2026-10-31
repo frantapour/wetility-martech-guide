@@ -419,6 +419,8 @@ app.get("/api/export/:what.csv", auth, wrap(async (req, res) => {
   res.send("﻿" + csv(rows));
 }));
 
+require("./connectors").routes(app, { auth, isAdmin, wrap, bad });
+
 app.get("/healthz", (req, res) => res.json({ ok: true }));
 app.get("*", (req, res) => res.sendFile(path.join(__dirname, "..", "public", "index.html")));
 app.use((err, req, res, next) => {

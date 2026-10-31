@@ -710,6 +710,41 @@ document.addEventListener("click", async e => {
   } catch (err) { toast(err.message); b.disabled = false; }
 });
 
+// ---------- view: settings & connections ----------
+function connCard(v) {
+  const r = S.connSync?.[v.id], open = S.connOpen === v.id || !v.configured && S.connOpen == null && v.id === "freshsales";
+  const status = !v.configured ? ["", "Not connected"] : v.lastTest?.ok === false ? ["bad", "Last test failed"] : v.lastTest?.ok ? ["ok", "Connected"] : ["warn", "Saved, not tested"];
+  const field = f => f.secret
+    ? `<label for="c-${v.id}-${f.key}">${esc(f.label)}${f.saved ? ` <span class="pill ok" style="margin-left:4px">saved${f.last4 ? ", ending " + esc(f.last4) : ""}</span>` : ""}${f.type === "textarea" ? `<textarea id="c-${v.id}-${f.key}" name="${f.key}" rows="4" spellcheck="false" placeholder="${f.saved ? "Leave blank to keep the saved key" : "Paste the whole .json file"}"></textarea>` : `<input id="c-${v.id}-${f.key}" name="${f.key}" type="password" autocomplete="new-password" placeholder="${f.saved ? "Leave blank to keep the saved value" : "Paste it here"}">`}${f.help ? `<span style="font-size:12px">${esc(f.help)}</span>` : ""}</label>`
+    : `<label for="c-${v.id}-${f.key}">${esc(f.label)}<input id="c-${v.id}-${f.key}" name="${f.key}" value="${esc(f.value)}" placeholder="${esc(f.placeholder)}" autocomplete="off">${f.help ? `<span style="font-size:12px">${esc(f.help)}</span>` : ""}</label>`;
+  return `<div class="card" style="padding:16px 20px;margin-top:12px">
+   <div style="display:flex;gap:10px;justify-content:space-between;align-items:flex-start"><button class="btn ghost" data-act="conn-open" data-id="${v.id}" style="padding:0;font-size:17px;font-weight:600;flex:1;min-width:0;justify-content:flex-start;text-align:left;white-space:normal;background:none">${icon(open ? "chev-down" : "chev", "sm")} ${esc(v.name)}</button><span class="pill ${status[0]}" style="flex-shrink:0">${status[1]}</span></div>
+   <p class="muted" style="margin:6px 0 0">${esc(v.intro)}</p>
+   ${v.lastSync ? `<p class="muted" style="font-size:13px;margin:6px 0 0">Last sync ${fmtDT(v.lastSync.at)}: ${v.lastSync.created} added, ${v.lastSync.updated} updated${v.lastSync.logged ? `, ${v.lastSync.logged} problems logged` : ""}${v.lastSync.failed?.length ? `; not synced: ${esc(v.lastSync.failed.join("; "))}` : ""}.</p>` : ""}
+   ${open ? `<form class="f" data-form="conn-save" data-id="${v.id}" autocomplete="off" style="margin-top:10px">
+    ${v.fields.map(field).join("")}
+    <p class="muted" style="font-size:12.5px;margin:0">Keys are stored encrypted and never shown again. Use credentials owned by a Wetility admin account, not a personal or agency one.</p>
+    <div class="acts"><button class="btn primary" type="submit">${icon("key", "sm")}Save</button>
+    ${v.configured ? `<button class="btn" type="button" data-act="conn-test" data-id="${v.id}">${icon("check", "sm")}Test connection</button><button class="btn" type="button" data-act="conn-sync" data-id="${v.id}">${icon("upload", "sm")}Sync now</button><button class="btn ghost" type="button" data-act="conn-remove" data-id="${v.id}">Remove keys</button>` : ""}</div>
+   </form>` : ""}
+   ${v.lastTest && open ? `<div class="box ${v.lastTest.ok ? "ok" : "bad"}"><b>${v.lastTest.ok ? "Connection works" : "Connection failed"}</b>${esc(v.lastTest.message)} <span class="muted" style="font-size:12px">${fmtDT(v.lastTest.at)}</span></div>` : ""}
+   ${S.connBusy === v.id ? `<div class="box info"><b>Syncing…</b>Reading configuration from ${esc(v.name)}. This can take a minute.</div>` : ""}
+   ${r ? `<h3>Sync result</h3><div class="list">${r.report.map(x => `<div class="row" style="grid-template-columns:24px minmax(0,1fr) auto"><div>${icon(x.ok ? "check" : "x", "sm")}</div><div class="txt"><b>${esc(x.part)}</b>${x.note ? ` <span class="muted">${esc(x.note)}</span>` : ""}${x.ok ? "" : `<div class="by sev-high">${esc(x.error)}</div>`}</div><div class="pill ${x.ok ? "ok" : "bad"}">${x.ok ? x.count + " items" : "failed"}</div></div>`).join("")}</div>
+     <p style="margin-top:10px">${r.created} new, ${r.updated} updated in place (your mappings were kept)${r.logged ? `, ${r.logged} new problems logged` : ""}. ${v.systems.map(s => `<a href="#sys-${s}">${esc(sysName(s))}</a>`).join(" · ")} · <a href="#consistency">Consistency check</a></p>
+     ${r.stale.length ? `<div class="box warn"><b>${r.stale.length} item${r.stale.length > 1 ? "s" : ""} in the registry no longer exist in ${esc(v.name)}</b><div class="chiprow" style="margin:6px 0">${r.stale.slice(0, 60).map(i => `<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" class="connstale" value="${i.id}" checked style="width:auto"><code>${esc(i.label || i.name)}</code> <span class="muted" style="font-size:12px">${esc(i.container)}</span></label>`).join("")}</div><button class="btn" data-act="conn-deprecate" data-id="${v.id}">Mark selected as deprecated</button></div>` : ""}` : ""}
+  </div>`;
+}
+function vSettings() {
+  if (!isAdmin()) return `<h1>Admins only</h1><p class="muted">Ask an admin to manage connections.</p>`;
+  if (!S.conns) { api("GET", "/api/connections").then(v => { S.conns = v; render(true); }).catch(e => toast(e.message)); return `<h1>Settings & connections</h1><p class="muted">Loading…</p>`; }
+  const n = S.conns.filter(c => c.configured).length;
+  return `<div class="eyebrow">Admin</div><h1>Settings & connections</h1>
+  <p class="lede">Connect the guide to Wetility's systems so the registry refreshes from the source instead of copy-paste. Connections read configuration only (fields, events, tags, ownership), never customer records. ${n} of ${S.conns.length} connected.</p>
+  ${S.conns.map(connCard).join("")}
+  <div class="card" style="padding:16px 20px;margin-top:12px"><h2 style="margin:0 0 6px">${icon("flow")} Branch.io</h2><p class="muted" style="margin:0">Branch has no API for reading its configuration. Import it from the dashboard export (Tracking → Import current setup).</p></div>`;
+}
+const connSet = v => { S.conns = S.conns.map(c => c.id === v.id ? v : c); };
+
 // ---------- shell ----------
 const AREAS = [
   { id: "home", label: "Home", icon: "home", href: "#overview" },
@@ -723,7 +758,7 @@ function areaOf(h) {
   if (["registry", "consistency", "flow", "import", "add"].includes(h) || h.startsWith("f-") || h.startsWith("sys-")) return "track";
   if (h === "kb" || h.startsWith("kb-") || h === "ref") return "kb";
   if (["results", "log", "issues"].includes(h)) return "results";
-  if (["admin", "activity", "password"].includes(h)) return "admin";
+  if (["admin", "activity", "password", "settings"].includes(h)) return "admin";
   return "home";
 }
 function subnav(area) {
@@ -733,7 +768,7 @@ function subnav(area) {
   if (area === "track") return [["Tracking", [["registry", "Registry"], ["consistency", "Consistency check", null, S.A.problems], ["flow", "Data flow"], ["import", "Import current setup"], ["add", "Add one item"]]]];
   if (area === "kb") return [["Knowledge", [["kb", "Vendor guidance"], ["ref", "Schema & naming rules"]]]];
   if (area === "results") return [["Results", [["results", "Results & KPIs"], ["issues", "Problems and fixes", null, openI], ["log", "Implementation log"]]]];
-  if (area === "admin") return [["Admin", [["admin", "People and access"], ["activity", "Activity"], ["password", "Change password"]]]];
+  if (area === "admin") return [["Admin", [["admin", "People and access"], ["settings", "Settings & connections"], ["activity", "Activity"], ["password", "Change password"]]]];
   return [["Shortcuts", [["playbooks", "All playbooks"], ["registry", "Tracking registry"], ["issues", "Problems and fixes", null, openI], ["import", "Import current setup"]]]];
 }
 function titleOf(h) {
@@ -744,9 +779,9 @@ function titleOf(h) {
   if (h.startsWith("kb-")) return S.data.kb.find(k => k.id === h.slice(3))?.title || "Article";
   return { overview: "Home", playbooks: "All playbooks", read: "Read this first", gates: "Gates", ws: "Workstreams", qa: "QA test cases", approval: "Final approval", day1: "Day-one tasks", esc: "Escalation & cadence",
     registry: "Tracking registry", consistency: "Consistency check", flow: "Data flow", import: "Import current setup", add: "Add one item", kb: "Vendor guidance", ref: "Schema & naming rules",
-    results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
+    results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", settings: "Settings & connections", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
 }
-const VIEWS = { overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity };
+const VIEWS = { overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings };
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (S.me?.must_change) return () => vPassword(true);
@@ -897,6 +932,7 @@ document.addEventListener("submit", async e => {
       case "merge": await api("POST", `/api/fields/${id}/merge`, { into: d.into }); toast("Merged"); await load(); location.hash = "f-" + d.into; return;
       case "impl": { const body = { ...d, std: fd.has("std") }; if (id) await api("PUT", "/api/impls/" + id, body); else await api("POST", "/api/impls", body); toast(id ? "Saved" : "Added to registry");
         if (!id) { S.prefSys = null; S.prefField = null; await load(); location.hash = d.field_id ? "f-" + d.field_id : "registry"; return; } break; }
+      case "conn-save": { connSet(await api("POST", "/api/connections/" + id, d)); toast("Saved"); render(true); return; }
       case "invite": { const r = await api("POST", "/api/users", d); S.tempPw = { email: r.email, pw: r.tempPassword }; S.users = null; f.reset(); render(true); return; }
       case "password": await api("POST", "/api/password", d); toast("Password saved"); S.me.must_change = false; await load(); location.hash = "overview"; render(); return;
     }
@@ -919,7 +955,7 @@ document.addEventListener("click", async e => {
   if (act === "kbf") { S.kbF = b.dataset.f; render(true); return; }
   if (act === "set-state") { if (!canWrite()) return; const key = b.dataset.key, v = b.dataset.v; S.statusMap[key] = { ...(S.statusMap[key] || {}), state: v, by_user: S.me.id, at: new Date().toISOString() }; render(true);
     try { await api("POST", "/api/status", { key, state: v }); toast({ done: "Marked done", pass: "Marked passed", fail: "Marked failed", blocked: "Marked blocked", progress: "In progress", approved: "Approved", todo: "Status cleared" }[v] || "Saved"); await refresh(); } catch (err) { toast(err.message); await refresh(); } return; }
-  const confirmFirst = ["del-comments", "del-logs", "del-results", "del-impl", "user-del", "merge", "reset"];
+  const confirmFirst = ["del-comments", "del-logs", "del-results", "del-impl", "user-del", "merge", "reset", "conn-remove"];
   if (confirmFirst.includes(act) && !b.dataset.armed) { b.dataset.armed = "1"; const t = b.textContent; b.textContent = "Click again to confirm"; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = t; } }, 3500); return; }
   try {
     switch (act) {
@@ -938,6 +974,11 @@ document.addEventListener("click", async e => {
       case "reopen": await api("PATCH", "/api/issues/" + id, { state: "open" }); toast("Reopened"); break;
       case "reset": { const r = await api("PATCH", "/api/users/" + id, { reset: true }); S.tempPw = { email: b.dataset.email, pw: r.tempPassword }; S.users = null; return render(true); }
       case "user-del": await api("DELETE", "/api/users/" + id); S.users = null; toast("Removed"); break;
+      case "conn-open": S.connOpen = S.connOpen === id ? "" : id; return render(true);
+      case "conn-test": b.disabled = true; { const v = await api("POST", `/api/connections/${id}/test`); connSet(v); toast(v.lastTest?.ok ? "Connection works" : "Connection failed"); } return render(true);
+      case "conn-remove": connSet(await api("DELETE", "/api/connections/" + id)); if (S.connSync) delete S.connSync[id]; toast("Keys removed"); return render(true);
+      case "conn-sync": S.connBusy = id; render(true); try { const r = await api("POST", `/api/connections/${id}/sync`); (S.connSync ||= {})[id] = r; connSet(r.connection); toast("Synced"); } finally { S.connBusy = null; } await refresh(); return;
+      case "conn-deprecate": { const ids = [...document.querySelectorAll(".connstale:checked")].map(x => +x.value); if (!ids.length) return; await api("POST", "/api/impls/deprecate", { ids }); S.connSync[id].stale = S.connSync[id].stale.filter(i => !ids.includes(i.id)); toast("Marked deprecated"); break; }
       default: return;
     }
     await refresh();

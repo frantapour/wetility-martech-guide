@@ -14,6 +14,7 @@ const P = {
   play: '<path d="M8 5.5v13l10-6.5z"/>',
   circle: '<circle cx="12" cy="12" r="7"/>',
   chev: '<path d="m9 6 6 6-6 6"/>',
+  "chev-down": '<path d="m6 9 6 6 6-6"/>',
   back: '<path d="m15 6-6 6 6 6"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
