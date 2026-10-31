@@ -109,13 +109,44 @@ function parseCSV(text) {
 }
 
 // Google Tag Manager: Admin > Export container (JSON).
+// Pixel and account IDs inside GTM tags: template parameters, custom HTML code and constant variables.
+const ID_RULES = [
+  ["Meta pixel", /fbq\(\s*['"]init['"]\s*,\s*['"]?(\d{8,20})/g],
+  ["TikTok pixel", /ttq\.(?:load|instance)\(\s*['"]([A-Z0-9]{12,30})['"]/g],
+  ["LinkedIn partner", /_linkedin_partner_id\s*=\s*['"]?(\d{4,12})/g],
+  ["Bing UET", /\bti\s*:\s*['"]?(\d{5,12})/g],
+  ["X pixel", /twq\(\s*['"](?:config|init)['"]\s*,\s*['"]([a-z0-9]{4,12})['"]/gi],
+  ["Snapchat pixel", /snaptr\(\s*['"]init['"]\s*,\s*['"]([0-9a-f-]{20,40})['"]/gi],
+  ["Microsoft Clarity", /["']clarity["']\s*,\s*["']script["']\s*,\s*["']([a-z0-9]{6,14})["']/gi],
+  ["Hotjar site", /hjid\s*:\s*(\d{5,10})/g],
+  ["Amplitude project key", /amplitude\.(?:init|getInstance\(\)\.init)\(\s*['"]([a-f0-9]{32})['"]/g],
+  ["GA4 measurement ID", /\b(G-[A-Z0-9]{6,12})\b/g],
+  ["Google Ads account", /\b(AW-\d{8,12})\b/g],
+  ["Floodlight (DV360/CM360)", /\b(DC-\d{6,12})\b/g],
+  ["GTM container", /\b(GTM-[A-Z0-9]{5,10})\b/g]
+];
+const PARAM_IDS = { gaawe: [["measurementIdOverride", "GA4 measurement ID"], ["measurementId", "GA4 measurement ID"]], googtag: [["tagId", "Google tag ID"]],
+  awct: [["conversionId", "Google Ads account"]], awud: [["conversionId", "Google Ads account"]], sp: [["conversionId", "Google Ads account"]],
+  flc: [["advertiserId", "Floodlight (DV360/CM360)"]], baut: [["tagId", "Bing UET"]], hjtc: [["hotjar_site_id", "Hotjar site"]] };
+function gtmIds(tag, vars) {
+  const out = [], add = (platform, id) => { id = String(id || "").trim(); if (!id || /^\{\{/.test(id)) return; if (/^\d+$/.test(id) && platform === "Google Ads account") id = "AW-" + id; if (/^\d+$/.test(id) && platform.startsWith("Floodlight")) id = "DC-" + id; if (!out.some(o => o.id === id)) out.push({ platform, id }); };
+  const resolve = v => String(v || "").replace(/\{\{([^}]+)\}\}/g, (m, n) => vars[n] != null ? vars[n] : m);
+  const params = tag.parameter || [];
+  for (const [key, platform] of PARAM_IDS[tag.type] || []) { const p = params.find(x => x.key === key); if (p) add(platform, resolve(p.value)); }
+  const flat = x => Array.isArray(x) ? x.map(flat).join("\n") : x && typeof x === "object" ? Object.values(x).map(flat).join("\n") : String(x ?? "");
+  const text = resolve(flat(params));
+  for (const [platform, re] of ID_RULES) { re.lastIndex = 0; let m; while ((m = re.exec(text))) add(platform, m[1]); }
+  if (/^cvt_/.test(tag.type)) for (const p of params) if (/pixel|pixelid|pixel_code|pixelcode|tagid/i.test(p.key) && typeof p.value === "string") add("Pixel (template " + tag.type + ")", resolve(p.value));
+  return out;
+}
 function parseGTM(text) {
   let j; try { j = JSON.parse(text); } catch (e) { throw new Error("That is not valid JSON. In GTM use Admin > Export container and paste or upload the file."); }
   const cv = j.containerVersion || j;
   const container = cv.container?.publicId || cv.container?.name || "";
   const p = (arr, key) => (arr || []).find(x => x.key === key)?.value;
   const trig = Object.fromEntries((cv.trigger || []).map(t => [t.triggerId, t]));
-  const items = [];
+  const vars = Object.fromEntries((cv.variable || []).filter(v => v.type === "c").map(v => [v.name, p(v.parameter, "value")]));
+  const items = [], ids = {};
   (cv.trigger || []).forEach(t => {
     const ce = (t.customEventFilter || [])[0]; const ev = ce ? p(ce.parameter, "arg1") : "";
     items.push({ kind: "trigger", name: ev || slug(t.name), label: t.name, parent: t.type || "", description: ev ? `Custom event trigger for ${ev}` : `Trigger type ${t.type}` });
@@ -123,12 +154,17 @@ function parseGTM(text) {
   (cv.tag || []).forEach(t => {
     const ev = p(t.parameter, "eventName") || p(t.parameter, "conversionLabel") || "";
     const fires = (t.firingTriggerId || []).map(id => trig[id]?.name || (id === "2147479553" ? "All Pages" : id)).join(", ");
-    items.push({ kind: "tag", name: ev || slug(t.name), label: t.name, parent: fires, description: `Tag type ${t.type}${t.paused ? " (paused)" : ""}` });
+    const found = gtmIds(t, vars);
+    found.forEach(f => { const k = f.platform + "|" + f.id; (ids[k] ||= { ...f, active: [], paused: [] })[t.paused ? "paused" : "active"].push(t.name); });
+    items.push({ kind: "tag", name: ev || slug(t.name), label: t.name, parent: fires, description: `Tag type ${t.type}${t.paused ? " (paused)" : ""}${found.length ? ". IDs: " + found.map(f => `${f.platform} ${f.id}`).join(", ") : ""}` });
   });
   (cv.variable || []).forEach(v => {
     const key = v.type === "v" ? p(v.parameter, "name") : "";
-    items.push({ kind: "variable", name: key || slug(v.name), label: v.name, parent: "", description: v.type === "v" ? `Data layer variable reading ${key}` : `Variable type ${v.type}` });
+    items.push({ kind: "variable", name: key || slug(v.name), label: v.name, parent: "", description: v.type === "v" ? `Data layer variable reading ${key}` : `Variable type ${v.type}${v.type === "c" ? ": " + String(p(v.parameter, "value") || "").slice(0, 60) : ""}` });
   });
+  Object.values(ids).forEach(x => items.push({ kind: "pixel ID", name: x.id, label: x.platform, parent: "Pixels and account IDs",
+    description: `${x.platform} ${x.id}. Active in: ${x.active.slice(0, 6).join(", ") || "none"}${x.active.length > 6 ? ` and ${x.active.length - 6} more` : ""}. Paused in: ${x.paused.length}. Check in the platform who owns this ID (Wetility or an agency).`,
+    state: x.active.length ? undefined : "deprecated" }));
   return { container, items };
 }
 
