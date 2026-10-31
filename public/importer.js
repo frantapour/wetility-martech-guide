@@ -37,10 +37,10 @@ function suggest(item, fields) {
 }
 
 // Copied field-layout screens (Freshsales, Zuper, respond.io contact fields) or any plain list.
-const NOISE = /^(add field|add group|preview|rename module|manage field dependencies|click to add fields here|learn more|\d+ - \d+ of \d+)$/i;
+const NOISE = /^(add field|add group|preview|rename module|manage field dependencies|click to add fields here|learn more|\d+ - \d+ of \d+|tooltip not added|add tooltip|edit tooltip|edit field|delete field|add\/edit choices|edit choices|\+\s*\d+ more|required|mandatory|hidden|read only)$/i;
 function parseList(text, opts = {}) {
   const raw = String(text || "").split(/\r?\n/).map(l => l.replace(/\t/g, " ").trim());
-  const lines = raw.filter(l => l && !/^add contacts faster/i.test(l));
+  const lines = raw.filter(l => l && !/^add \w+ faster with/i.test(l) && !(l.length > 90 && /\.\s*$/.test(l)));
   let container = opts.container || "", section = "", group = "";
   const items = [], next = i => lines[i + 1] || "", next2 = i => lines[i + 2] || "";
   for (let i = 0; i < lines.length; i++) {
