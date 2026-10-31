@@ -23,7 +23,7 @@ const STEP_OPTS = [["todo", "Not started"], ["progress", "In progress"], ["done"
 const TEST_OPTS = [["todo", "Not run"], ["pass", "Pass"], ["fail", "Fail"]];
 const GATE_OPTS = [["todo", "Pending"], ["progress", "In review"], ["approved", "Approved"], ["blocked", "Blocked"]];
 const CHECK_OPTS = [["todo", "Open"], ["done", "Done"]];
-const CODE_LABEL = { consistent: "Consistent", platform: "Platform-required name", differs: "Name differs", old: "Uses an old name", pending: "Rename pending", unconfirmed: "Name to confirm", unmapped: "Not mapped", deprecated: "Deprecated" };
+const CODE_LABEL = { consistent: "Consistent", platform: "Fixed name (platform-required or cannot be renamed)", differs: "Name differs", old: "Uses an old name", pending: "Rename pending", unconfirmed: "Name to confirm", unmapped: "Not mapped", deprecated: "Deprecated" };
 
 let S = { me: null, data: null, A: null, q: "", flag: null, users: null, tempPw: null };
 let filterMe = null; try { filterMe = localStorage.getItem("mt_me"); } catch (e) {}
@@ -61,7 +61,9 @@ function analyze() {
   const live = i => i.state !== "deprecated";
   const privacy = I.filter(i => { const f = fieldOf(i.field_id); return f && live(i) && ((f.pii === "sensitive" && NO_SENSITIVE.includes(i.system)) || (f.pii === "personal" && NO_PERSONAL.includes(i.system))); });
   const g = {}; I.filter(i => live(i) && i.field_id && !/^\[/.test(i.name)).forEach(i => { (g[[i.field_id, i.system, i.kind, norm(i.name)].join("|")] ??= []).push(i); });
-  const dups = Object.values(g).filter(a => a.length > 1);
+  const g3 = {}; I.filter(i => live(i) && i.field_id && !i.std && !/^\[/.test(i.name)).forEach(i => { (g3[[i.field_id, i.system, i.kind].join("|")] ??= []).push(i); });
+  const sameName = Object.values(g).filter(a => a.length > 1), sameKey = new Set(sameName.flat().map(i => i.id));
+  const dups = [...sameName, ...Object.values(g3).filter(a => a.length > 1 && a.some(i => !sameKey.has(i.id)))];
   const g2 = {}; I.filter(i => live(i) && i.field_id && !i.std && !/^\[/.test(i.name)).forEach(i => { (g2[i.system + "|" + norm(i.name)] ??= []).push(i); });
   const collisions = Object.values(g2).filter(a => new Set(a.map(x => x.field_id)).size > 1);
   const missing = []; active.forEach(f => (f.expected || []).forEach(sys => { if (!(byField[f.id] || []).some(i => i.system === sys && live(i))) missing.push([f, sys]); }));
@@ -273,7 +275,7 @@ function vRegistry() {
   <div class="filters"><input id="regq" type="search" placeholder="Filter by name, alias, GTM label or container" value="${esc(S.regQ || "")}" aria-label="Filter registry">
    <select id="regkind" aria-label="Type"><option value="">All types</option>${["event", "identifier", "parameter", "attribute"].map(k => `<option ${kind === k ? "selected" : ""}>${k}</option>`).join("")}</select>
    <select id="regprob" aria-label="Problems"><option value="">All fields</option><option value="1" ${prob ? "selected" : ""}>Only fields with problems</option></select>
-   ${canWrite() ? `<a class="btn primary" href="#add">Add item or field</a>` : ""}<a class="btn" href="/api/export/registry.csv">Download CSV</a></div>
+   ${canWrite() ? `<a class="btn primary" href="#import">Import current setup</a><a class="btn" href="#add">Add one item</a>` : ""}<a class="btn" href="/api/export/registry.csv">Download CSV</a></div>
   <div class="legend"><span><span class="cell c-consistent">name</span>Consistent</span><span><span class="cell c-platform">name</span>Platform-required name</span><span><span class="cell c-differs">name</span>Name differs</span><span><span class="cell c-pending">name</span>Rename pending</span><span><span class="cell c-unconfirmed">name</span>To confirm</span><span><span class="cell c-dup">name</span>Duplicate</span><span><span class="cell c-privacy">name</span>Privacy conflict</span><span><span class="cell c-missing">missing</span>Expected, not recorded</span></div>
   <div class="tbl"><table class="regtbl"><tr><th rowspan="2">Canonical field</th>${layerCounts.map(([l, n]) => `<th class="layer" colspan="${n}">${l}</th>`).join("")}</tr><tr>${SYSTEMS.map(s => `<th><a href="#sys-${s.id}">${esc(s.short)}</a></th>`).join("")}</tr>
   ${fields.map(fieldRow).join("") || `<tr><td colspan="${SYSTEMS.length + 1}" class="muted">No fields match.</td></tr>`}</table></div>
@@ -294,7 +296,7 @@ function implCard(i, f) {
   const acts = canWrite() ? [
     ["differs", "old"].includes(c) ? `<button class="btn" data-act="align" data-id="${i.id}">Align name to ${esc(f.name)}</button>` : "",
     c === "pending" ? `<button class="btn primary" data-act="renamed" data-id="${i.id}">Renamed in ${esc(sysName(i.system))}</button>` : "",
-    ["differs", "old", "pending"].includes(c) ? `<button class="btn" data-act="std-on" data-id="${i.id}" title="The platform requires this exact name, so it cannot be changed">Platform requires this name</button>` : "",
+    ["differs", "old", "pending"].includes(c) ? `<button class="btn" data-act="std-on" data-id="${i.id}" title="The platform dictates this name, or it cannot be renamed (for example a Freshsales API key)">Name is fixed</button>` : "",
     c === "platform" ? `<button class="btn" data-act="std-off" data-id="${i.id}">Not platform-required</button>` : "",
     `<button class="btn" data-act="del-impl" data-id="${i.id}">Delete</button>`].join("") : "";
   return `<div class="impl"><div class="t"><b>${esc(sysName(i.system))}</b><span class="muted">${esc(i.kind)}</span>${chip(i)}<span class="pill ${i.state === "live" ? "ok" : i.state === "rename-pending" ? "warn" : ""}">${esc(i.state)}</span><span class="muted" style="font-size:12px">${esc(CODE_LABEL[c] || "")}</span></div>
@@ -370,12 +372,12 @@ function vConsistency() {
   const A = S.A;
   const sec = (title, why, items, row) => `<h2>${title} <span class="muted" style="font:400 14px var(--f-body)">${items.length}</span></h2><p class="muted">${why}</p>${items.length ? items.map(row).join("") : `<div class="empty">None.</div>`}`;
   const implLine = (i, extra = "") => { const f = A.fieldOf(i.field_id); return `<div class="impl"><div class="t"><b>${esc(sysName(i.system))}</b><span class="muted">${esc(i.kind)}</span>${chip(i)}${f ? `<span class="muted">→</span><a href="#f-${f.id}"><code>${esc(f.name)}</code></a>` : ""}${i.label ? `<span class="muted" style="font-size:12.5px">${esc(i.label)}</span>` : ""}</div>${extra}</div>`; };
-  const acts = i => canWrite() ? `<div class="acts">${A.code[i.id] === "pending" ? `<button class="btn primary" data-act="renamed" data-id="${i.id}">Renamed in ${esc(sysName(i.system))}</button>` : `<button class="btn" data-act="align" data-id="${i.id}">Align to canonical</button>`}<button class="btn" data-act="std-on" data-id="${i.id}">Platform requires this name</button></div>` : "";
+  const acts = i => canWrite() ? `<div class="acts">${A.code[i.id] === "pending" ? `<button class="btn primary" data-act="renamed" data-id="${i.id}">Renamed in ${esc(sysName(i.system))}</button>` : `<button class="btn" data-act="align" data-id="${i.id}">Align to canonical</button>`}<button class="btn" data-act="std-on" data-id="${i.id}">Name is fixed</button></div>` : "";
   return `<div class="eyebrow">Data and tracking</div><h1>Consistency check</h1>
   <p class="muted">Recalculated from the registry every time it changes. Work top to bottom: privacy first, then duplicates, then names.</p>
   <div class="tiles"><div class="tile"><div class="n">${A.score == null ? "–" : A.score + "%"}</div><div class="l">Names consistent (mapped items)</div></div><div class="tile"><div class="n">${A.privacy.length}</div><div class="l">Privacy conflicts</div></div><div class="tile"><div class="n">${A.dups.length + A.collisions.length + A.similar.length}</div><div class="l">Duplicates</div></div><div class="tile"><div class="n">${A.naming.length + A.pending.length}</div><div class="l">Names to align</div></div><div class="tile"><div class="n">${A.missing.length}</div><div class="l">Gaps</div></div></div>
   ${sec("Privacy conflicts", "Data classed as sensitive or personal recorded in a browser, analytics or ad-platform system. Fix or get Information Officer approval.", A.privacy, i => implLine(i, `<div class="muted" style="font-size:13px">${esc(i.description)}</div>`))}
-  ${sec("Duplicate implementations", "The same event or field implemented more than once in one system. Usually double-counting; keep one.", A.dups, g => `<div class="box warn">${g.map(i => implLine(i)).join("")}</div>`)}
+  ${sec("Duplicate implementations", "Two items in one system for the same canonical field (for example two Freshsales fields both holding the meter number), or the same item recorded twice. Keep one; deprecate or migrate the other.", A.dups, g => `<div class="box warn">${g.map(i => implLine(i)).join("")}</div>`)}
   ${sec("Name collisions", "The same name in one system used for two different canonical fields. One of them needs a different name.", A.collisions, g => `<div class="box warn">${g.map(i => implLine(i)).join("")}</div>`)}
   ${sec("Possible duplicate fields", "Two canonical fields that look like the same thing. Merge so only one name survives.", A.similar, ([x, y]) => `<div class="impl"><div class="t"><a href="#f-${x.id}"><code>${esc(x.name)}</code></a><span class="muted">and</span><a href="#f-${y.id}"><code>${esc(y.name)}</code></a></div>${canWrite() ? `<div class="acts"><button class="btn" data-act="merge" data-from="${y.id}" data-into="${x.id}">Keep ${esc(x.name)}</button><button class="btn" data-act="merge" data-from="${x.id}" data-into="${y.id}">Keep ${esc(y.name)}</button></div>` : ""}</div>`)}
   ${sec("Names that differ from the canonical name", "Align the name in the system, or mark it as platform-required if the platform dictates it (for example GA4 generate_lead).", A.naming, i => implLine(i, acts(i)))}
@@ -551,16 +553,109 @@ function vActivity() {
   return `<div class="eyebrow">Admin</div><h1>Activity</h1><p class="muted">Every change to the registry, knowledge base and accounts, newest first.</p><div class="feed">${S.data.audit.map(auditHTML).join("") || `<div class="empty">No activity yet.</div>`}</div>`;
 }
 
+
+// ---------- view: import current setup ----------
+const HOWTO = {
+  freshsales: "Admin Settings > Module customisation > Contacts (or Deals) > Fields: select the whole field layout, copy and paste it here. Repeat for Deals and Accounts with the module name in Container. For API names (cf_...), export the fields as CSV and use the CSV format.",
+  gtm: "Admin > Export container > choose the latest published version > Export. Upload the JSON file here (format: GTM container export). Tags, triggers and variables are imported with what they fire on.",
+  ga4: "Admin > Data display > Events: copy the event names (one per line). Repeat with Custom definitions for parameters, choosing type 'event parameter'.",
+  firebase: "Firebase console > Analytics > Events, or GA4 Admin for the app stream: copy the event names.",
+  amplitude: "Data > Events: export the event list as CSV, then use the CSV format.",
+  branch: "Branch dashboard > Events and Integrations: copy event names and connected ad networks (type 'integration').",
+  respond: "Workspace Settings > Contact fields: copy the list. Webhooks and workflow steps can be added the same way with the matching type.",
+  zuper: "Settings > Custom fields (Jobs, Customers): copy the list. Webhooks: Settings > Developer Hub > Webhooks.",
+  meta: "Events Manager > your dataset > Overview: copy the event names. Also record connected partners and integrations.",
+  tiktok: "Events Manager > your pixel > Events: copy the event names.",
+  gads: "Goals > Conversions > Summary: copy the conversion action names.",
+  datalayer: "Ask the web developer for the dataLayer pushes in the site code, one event or key per line."
+};
+function impRows() { return S.imp?.rows || []; }
+function vImport() {
+  if (!canWrite()) return `<h1>View-only access</h1><p class="muted">Ask an admin for editor access to import.</p>`;
+  const m = S.imp ||= { format: "list", system: "freshsales", container: "", kind: "field", state: "live", fixed: true, text: "", rows: null, result: null };
+  const rows = impRows(), A = S.A;
+  const existing = new Set(S.data.impls.filter(i => i.system === m.system && i.container === m.container).map(i => i.name.toLowerCase()));
+  const chosen = {}; rows.forEach((r, i) => { if (r.on && r.field_id) (chosen[r.field_id] ??= []).push(i); });
+  const fieldById = Object.fromEntries(S.data.fields.map(f => [f.id, f]));
+  const nOn = rows.filter(r => r.on).length, nMapped = rows.filter(r => r.on && r.field_id).length;
+  const stale = m.result ? S.data.impls.filter(i => i.system === m.system && i.container === m.container && i.state !== "deprecated" && !m.result.names.has(i.name.toLowerCase())) : [];
+  return `<div class="eyebrow">Data and tracking</div><h1>Import what is already set up</h1>
+  <p class="muted">Bring in the fields, events, tags and variables that exist today, system by system. Matching standard fields are suggested; you confirm before anything is saved. Importing the same system and container again updates items instead of duplicating them.</p>
+  <form class="f" id="impform">
+   <div class="two"><label for="imsys">System<select id="imsys" data-imp="system">${SYSTEMS.map(s => `<option value="${s.id}" ${s.id === m.system ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
+   <label for="imfmt">What you are pasting<select id="imfmt" data-imp="format"><option value="list" ${m.format === "list" ? "selected" : ""}>Copied list or field layout (one per line)</option><option value="csv" ${m.format === "csv" ? "selected" : ""}>CSV with a header row</option><option value="gtm" ${m.format === "gtm" ? "selected" : ""}>GTM container export (JSON)</option></select></label></div>
+   <div class="box info" style="margin:0"><b>Where to get it from ${esc(sysName(m.system))}</b>${esc(HOWTO[m.system] || "Copy the list of names from the tool's settings, one per line.")}</div>
+   <div class="two"><label for="imcont">Container, module or property (keeps re-imports separate)<input id="imcont" data-imp="container" value="${esc(m.container)}" placeholder="e.g. Contacts, Deals, GTM-N9XFQZMK"></label>
+   <label for="imkind">Type for every item (GTM export sets its own)<input id="imkind" data-imp="kind" list="imkl" value="${esc(m.kind)}"><datalist id="imkl">${(SYS[m.system]?.kinds || []).map(k => `<option value="${esc(k)}">`).join("")}</datalist></label></div>
+   <div class="two"><label for="imst">Status<select id="imst" data-imp="state"><option value="live" ${m.state === "live" ? "selected" : ""}>Live (set up today)</option><option value="planned" ${m.state === "planned" ? "selected" : ""}>Planned</option></select></label>
+   <label style="display:flex;gap:8px;align-items:center;color:var(--fg);align-self:end"><input type="checkbox" data-imp="fixed" ${m.fixed ? "checked" : ""} style="width:auto"> Names can't be renamed in this system (for example Freshsales field keys)</label></div>
+   <label for="imtext">Paste here, or <label for="imfile" style="display:inline;color:var(--info);cursor:pointer;text-decoration:underline">upload a file</label><input id="imfile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden><textarea id="imtext" data-imp="text" rows="10" placeholder="Contacts&#10;Basic Information&#10;Lead Card&#10;Add field&#10;First name&#10;Mobile&#10;...">${esc(m.text)}</textarea></label>
+   <div class="acts"><button class="btn primary" type="button" data-act="imp-preview">Preview</button>${rows.length ? `<button class="btn" type="button" data-act="imp-clear">Start again</button>` : ""}</div>
+  </form>
+  ${m.result ? `<div class="box ${stale.length ? "warn" : "info"}"><b>Imported into ${esc(sysName(m.system))}${m.container ? " / " + esc(m.container) : ""}</b>${m.result.created} added, ${m.result.updated} updated, ${m.result.replacedPlaceholder} placeholders replaced. <a href="#sys-${m.system}">See everything in ${esc(sysName(m.system))}</a> · <a href="#consistency">Consistency check</a>
+   ${stale.length ? `<p style="margin:8px 0 4px">${stale.length} item${stale.length > 1 ? "s" : ""} recorded for ${esc(m.container || "this system")} were not in this import. If they no longer exist, mark them deprecated:</p><div class="chiprow">${stale.map(i => `<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" class="impstale" value="${i.id}" checked style="width:auto"><code>${esc(i.name)}</code></label>`).join("")}</div><div class="acts" style="margin-top:6px"><button class="btn" data-act="imp-deprecate">Mark selected as deprecated</button></div>` : ""}</div>` : ""}
+  ${rows.length ? `<h2>Preview: ${rows.length} item${rows.length > 1 ? "s" : ""}${m.container ? " in " + esc(m.container) : ""}</h2>
+  <p class="muted">${nOn} selected, ${nMapped} mapped to a standard field. Unmapped items are still recorded; map them later from the consistency check, or create a standard field if they are genuinely new.</p>
+  <div class="acts"><button class="btn" data-act="imp-all" data-v="1">Select all</button><button class="btn" data-act="imp-all" data-v="0">Select none</button><button class="btn primary" data-act="imp-save" ${nOn ? "" : "disabled"}>Import ${nOn} item${nOn === 1 ? "" : "s"}</button></div>
+  <div class="tbl" style="margin-top:10px"><table><tr><th></th><th>In ${esc(sysName(m.system))}</th><th>Group / fires on</th><th>Type</th><th>Standard field</th><th>Check</th></tr>
+  ${rows.map((r, i) => { const f = r.field_id && fieldById[r.field_id]; const notes = [];
+    if (existing.has(r.name.toLowerCase())) notes.push(`<span class="pill">updates existing</span>`);
+    if (r.on && r.field_id && chosen[r.field_id].length > 1) notes.push(`<span class="pill bad" title="${esc(chosen[r.field_id].map(j => rows[j].label || rows[j].name).join(", "))}">same field as ${chosen[r.field_id].length - 1} other row${chosen[r.field_id].length > 2 ? "s" : ""}</span>`);
+    if (f && ((f.pii === "sensitive" && NO_SENSITIVE.includes(m.system)) || (f.pii === "personal" && NO_PERSONAL.includes(m.system)))) notes.push(`<span class="pill bad">${esc(f.pii)} data must not be here</span>`);
+    if (r.why) notes.push(`<span class="muted" style="font-size:12px">${esc(r.why)}</span>`);
+    return `<tr><td><input type="checkbox" data-imp-on="${i}" ${r.on ? "checked" : ""} aria-label="Include ${esc(r.label || r.name)}" style="width:auto"></td><td><b>${esc(r.label || r.name)}</b>${r.label && r.label !== r.name ? `<div class="by"><code>${esc(r.name)}</code></div>` : ""}</td><td class="muted" style="font-size:12.5px">${esc(r.parent)}</td><td class="muted" style="font-size:12.5px">${esc(r.kind)}</td>
+     <td><select data-imp-field="${i}" aria-label="Standard field for ${esc(r.label || r.name)}" style="max-width:220px">${fieldOptions(r.field_id, true)}</select></td><td><div class="chiprow">${notes.join("")}</div></td></tr>`; }).join("")}</table></div>
+  <div class="acts" style="margin-top:10px"><button class="btn primary" data-act="imp-save" ${nOn ? "" : "disabled"}>Import ${nOn} item${nOn === 1 ? "" : "s"}</button></div>` : ""}`;
+}
+function impPreview() {
+  const m = S.imp; m.result = null;
+  let parsed;
+  try {
+    parsed = m.format === "gtm" ? Importer.parseGTM(m.text) : m.format === "csv" ? Importer.parseCSV(m.text) : Importer.parseList(m.text, { container: m.container, labelsAreNames: !["freshsales", "zuper", "respond", "credit"].includes(m.system) });
+  } catch (e) { toast(e.message); return; }
+  if (!parsed.items.length) { toast("Nothing recognisable to import. Check the format."); return; }
+  if (!m.container && parsed.container) m.container = parsed.container;
+  m.rows = parsed.items.map(it => { const s = Importer.suggest(it, S.data.fields); return { ...it, kind: it.kind || m.kind, on: true, field_id: s?.id || "", why: s ? "suggested: " + s.why : "" }; });
+}
+async function impSave() {
+  const m = S.imp, items = m.rows.filter(r => r.on).map(r => ({ system: m.system, container: m.container, kind: r.kind || m.kind, name: r.name, label: r.label || "", parent: r.parent || "", field_id: r.field_id || "", std: m.fixed, state: m.state, description: r.description || "" }));
+  const res = await api("POST", "/api/impls/bulk", { items });
+  m.result = { ...res, names: new Set(items.map(i => i.name.toLowerCase())) };
+  m.rows = null; m.text = "";
+  await load(); render(); scrollTo(0, 0);
+}
+document.addEventListener("input", e => { const k = e.target.dataset?.imp; if (k && S.imp && k === "text") S.imp.text = e.target.value; });
+document.addEventListener("change", e => {
+  const el = e.target; if (!S.imp) return;
+  if (el.id === "imfile" && el.files[0]) { const r = new FileReader(); r.onload = () => { S.imp.text = String(r.result); if (/\.json$/i.test(el.files[0].name)) S.imp.format = "gtm"; else if (/\.csv$/i.test(el.files[0].name)) S.imp.format = "csv"; render(true); }; r.readAsText(el.files[0]); return; }
+  const k = el.dataset.imp;
+  if (k) { S.imp[k] = el.type === "checkbox" ? el.checked : el.value; if (k === "system" || k === "format") { S.imp.rows = null; if (k === "system") { S.imp.kind = SYS[el.value]?.kinds?.[0] || "field"; S.imp.fixed = ["freshsales", "zuper", "respond", "credit", "gads", "meta", "tiktok", "branch"].includes(el.value); } render(true); } return; }
+  if (el.dataset.impOn != null) { S.imp.rows[+el.dataset.impOn].on = el.checked; render(true); return; }
+  if (el.dataset.impField != null) { const r = S.imp.rows[+el.dataset.impField]; r.field_id = el.value; r.why = el.value ? "chosen" : ""; render(true); }
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^=imp-]"); if (!b || !S.imp) return;
+  e.preventDefault();
+  const a = b.dataset.act;
+  try {
+    if (a === "imp-preview") { S.imp.text = $("#imtext").value; S.imp.container = $("#imcont").value; impPreview(); render(true); }
+    else if (a === "imp-clear") { S.imp.rows = null; S.imp.result = null; render(true); }
+    else if (a === "imp-all") { S.imp.rows.forEach(r => (r.on = b.dataset.v === "1")); render(true); }
+    else if (a === "imp-save") { b.disabled = true; await impSave(); toast("Imported"); }
+    else if (a === "imp-deprecate") { const ids = [...document.querySelectorAll(".impstale:checked")].map(x => +x.value); if (!ids.length) return; await api("POST", "/api/impls/deprecate", { ids }); S.imp.result = null; await refresh(); toast("Marked deprecated"); }
+  } catch (err) { toast(err.message); b.disabled = false; }
+});
+
 // ---------- shell ----------
 const NAV = () => [
   ["Start", [["overview", "Programme overview"], ["read", "Read this first"], ["gates", "Gates G0–G6"], ["ws", "Workstreams"]]],
   ["Playbooks", PB.map(p => [p.id, p.no + " " + p.title])],
-  ["Data and tracking", [["registry", "Tracking registry"], ["consistency", "Consistency check", S.A.problems], ["flow", "Data flow"], ["add", "Add to registry"]]],
+  ["Data and tracking", [["registry", "Tracking registry"], ["consistency", "Consistency check", S.A.problems], ["flow", "Data flow"], ["import", "Import current setup"], ["add", "Add one item"]]],
   ["Knowledge base", [["kb", "Vendor guidance"]]],
   ["Prove it works", [["qa", "QA test cases"], ["results", "Results & KPIs"], ["log", "Implementation log"], ["issues", "Problems and fixes", S.data.issues.filter(x => x.state === "open").length]]],
   ["Reference", [["ref", "Schema and naming rules"], ["day1", "Day-one tasks"], ["esc", "Escalation & cadence"], ["approval", "Final approval checklist"]]],
   ...(isAdmin() ? [["Admin", [["admin", "People and access"], ["activity", "Activity"]]]] : [])];
-const VIEWS = { overview: vOverview, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, password: () => vPassword(false), admin: vAdmin, activity: vActivity };
+const VIEWS = { overview: vOverview, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity };
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (S.me?.must_change) return () => vPassword(true);
@@ -591,7 +686,7 @@ function renderNav() {
 let deferred = false;
 function render(keep) {
   const ae = document.activeElement;
-  if (keep && ae && ae.closest && ae.closest("#view form.f") && ae.matches("input,textarea,select")) { deferred = true; return; }
+  if (keep && ae && ae.closest && ae.closest("#view form.f:not(#impform)") && ae.matches("input,textarea,select")) { deferred = true; return; }
   const y = scrollY, drafts = {};
   document.querySelectorAll("#view form.f textarea, #view form.f input:not([type=checkbox])").forEach(el => { if (el.id && el.value) drafts[el.id] = el.value; });
   const openD = [...document.querySelectorAll("#view details[open]")].map(d => d.querySelector("summary")?.textContent);

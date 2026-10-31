@@ -413,6 +413,57 @@ async function seed() {
   }
 }
 
+// v2: standard fields implied by the live Freshsales Contacts layout, plus the Freshsales social integration risk.
+const FIELDS_V2 = [
+  F("utm_medium", "utm_medium", "parameter", "Latest campaign medium from the landing URL.", "Medium attribution (latest touch)", "none", "Reeza", ["umbraco", "freshsales", "ledger", "ga4"]),
+  F("utm_content", "utm_content", "parameter", "Latest ad or creative identifier from the landing URL.", "Creative attribution", "none", "Reeza", ["umbraco", "freshsales", "ledger"]),
+  F("utm_source_first", "utm_source_first", "parameter", "UTM source at first touch; never overwritten.", "First-touch source attribution", "none", "Reeza", ["freshsales", "ledger"], ["first_touch_utm_source", "original_utm_source"]),
+  F("utm_medium_first", "utm_medium_first", "parameter", "UTM medium at first touch; never overwritten.", "First-touch medium attribution", "none", "Reeza", ["freshsales", "ledger"], ["original_utm_medium"]),
+  F("utm_campaign_first", "utm_campaign_first", "parameter", "UTM campaign at first touch; never overwritten.", "First-touch campaign attribution", "none", "Reeza", ["freshsales", "ledger"], ["original_utm_campaign"]),
+  F("lead_source", "lead_source", "attribute", "Source classification of the lead (current value).", "Source mix", "none", "Reeza", ["freshsales", "ledger"], ["source"]),
+  F("lead_source_first", "lead_source_first", "attribute", "Source classification at first touch.", "First-touch source mix", "none", "Reeza", ["freshsales", "ledger"], ["first_touch_source"]),
+  F("lead_source_latest", "lead_source_latest", "attribute", "Source classification at the most recent touch.", "Latest-touch source mix", "none", "Reeza", ["freshsales", "ledger"], ["recent_source"]),
+  F("meta_lead_id", "meta_lead_id", "identifier", "Meta Lead Ads leadgen_id (15 to 17 digits) for Instant Form leads.", "Meta CRM conversion-leads matching", "pseudonymous", "Josh", ["freshsales", "ledger", "meta"]),
+  F("tiktok_lead_id", "tiktok_lead_id", "identifier", "TikTok lead form lead ID.", "TikTok lead-quality matching", "pseudonymous", "Josh", ["freshsales", "ledger", "tiktok"]),
+  F("freshsales_contact_id", "freshsales_contact_id", "identifier", "Freshsales contact UID.", "CRM contact join", "pseudonymous", "Josh", ["freshsales", "ledger"], ["freshsales_contact_uid"]),
+  F("versofy_uid", "versofy_uid", "identifier", "Versofy customer UID.", "Versofy join", "pseudonymous", "Josh", ["freshsales", "ledger"]),
+  F("email", "email", "identifier", "Contact email address. Hash before sending to any ad platform; never in dataLayer or GA4.", "Contact and ad matching (hashed)", "personal", "Josh", ["freshsales", "ledger"], ["emails"]),
+  F("sa_id_number", "sa_id_number", "attribute", "South African ID number. Credit process only.", "Identity verification", "sensitive", "Josh", ["credit", "freshsales"], ["id_number"]),
+  F("bank_account", "bank_account", "attribute", "Bank account details for debit orders. Billing only.", "Billing", "sensitive", "Finance", ["freshsales"]),
+  F("credit_check_consent", "credit_check_consent", "attribute", "Customer consent to run a credit check.", "Lawful basis for credit assessment", "none", "Josh", ["freshsales", "ledger"]),
+  F("lifecycle_stage", "lifecycle_stage", "attribute", "CRM lifecycle stage of the contact.", "Funnel position", "none", "Josh", ["freshsales", "ledger"]),
+  F("lead_status", "lead_status", "attribute", "CRM status within the lifecycle stage.", "Funnel position detail", "none", "Josh", ["freshsales", "ledger"], ["status"]),
+  F("lost_reason", "lost_reason", "attribute", "Why a lead or deal was lost.", "Loss reasons", "none", "Josh", ["freshsales", "ledger"]),
+  F("contract_sent", "contract_sent", "event", "Contract sent to the customer.", "Contracts issued", "none", "Josh", ["freshsales", "ledger", "amplitude"]),
+  F("referrer_code", "referrer_code", "identifier", "Referral code of the referring customer, installer or partner.", "Referral attribution", "pseudonymous", "Reeza", ["freshsales", "ledger"]),
+  F("meter_number", "meter_number", "identifier", "One Bill prepaid meter number linked to the customer.", "One Bill meter join", "pseudonymous", "Beryl", ["freshsales", "app", "ledger"], ["one_bill_meter_number"]),
+  F("credit_score_group", "credit_score_group", "attribute", "Grouping of the credit score (SQL / Non-Qualified / No Score). Derived from credit data.", "Lead quality bands", "sensitive", "Josh", ["freshsales", "ledger"])
+];
+async function seedV2() {
+  const done = await q("SELECT value FROM meta WHERE key='seeded_v2'");
+  if (done.rowCount) return;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const f of FIELDS_V2) {
+      await client.query(`INSERT INTO fields (id,name,kind,description,measures,pii,owner,aliases,expected) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO NOTHING`,
+        [f.id, f.name, f.kind, f.description, f.measures, f.pii, f.owner, JSON.stringify(f.aliases), JSON.stringify(f.expected)]);
+    }
+    await client.query(`UPDATE fields SET aliases = aliases || '["sales_intent_level_score"]'::jsonb WHERE id='intent_score' AND NOT aliases ? 'sales_intent_level_score'`);
+    await client.query(`UPDATE fields SET aliases = aliases || '["sql_credit"]'::jsonb WHERE id='credit_qualified' AND NOT aliases ? 'sql_credit'`);
+    await client.query(`UPDATE fields SET aliases = aliases || '["deal_approved"]'::jsonb WHERE id='credit_approved' AND NOT aliases ? 'deal_approved'`);
+    await client.query(`INSERT INTO impls (field_id,system,container,kind,name,label,state,description) VALUES
+      (NULL,'freshsales','Integrations','integration','social_media_integration','Social media accounts (Meta pages, ad accounts, lead forms)','live',
+       'Connected 13 May 2026 by Kopano Boikanyo (former DarkMatter agency) using a personal Yahoo account. Reconnect from a Wetility-owned account.')`);
+    await client.query(`INSERT INTO issues (sec,ref,title,detail,severity) VALUES ('pb41','Step 5',
+      'Freshsales social media integration is connected through a former agency person''s personal account',
+      'Freshsales > Integrate Social Media with CRM shows one connected account: Kopano Boikanyo (personal Yahoo address), connected Wed 13 May 2026. DarkMatter''s engagement ended 14 Oct 2026. If that account is disconnected, Meta lead-form leads stop flowing into Freshsales. Confirm which pages, ad accounts and forms it feeds, then reconnect from a Wetility-owned account with two admins.','high')`);
+    await client.query("INSERT INTO meta (key,value) VALUES ('seeded_v2',$1)", [new Date().toISOString()]);
+    await client.query("COMMIT");
+    console.log("Applied registry update v2.");
+  } catch (e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
+}
+
 async function ensureAdmin() {
   const email = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
   const pw = process.env.ADMIN_PASSWORD || "";
@@ -424,4 +475,4 @@ async function ensureAdmin() {
   console.log("Created first admin:", email);
 }
 
-module.exports = { seed, ensureAdmin };
+module.exports = { seed, seedV2, ensureAdmin };

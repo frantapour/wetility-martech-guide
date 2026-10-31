@@ -5,7 +5,7 @@ const session = require("express-session");
 const PgStore = require("connect-pg-simple")(session);
 const bcrypt = require("bcryptjs");
 const { pool, init, q } = require("./db");
-const { seed, ensureAdmin } = require("./seed");
+const { seed, seedV2, ensureAdmin } = require("./seed");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -287,6 +287,51 @@ app.post("/api/impls/:id/std", auth, canWrite, wrap(async (req, res) => {
   await audit(req, "impl", req.params.id, req.body.std ? "marked platform-required name" : "unmarked platform-required name", r.rows[0]);
   res.json({ ok: true });
 }));
+// Bulk import of what is already set up in a system. Re-importing the same system/container updates items instead of duplicating them.
+app.post("/api/impls/bulk", auth, canWrite, wrap(async (req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 1500) : [];
+  if (!items.length) return bad(res, "Nothing to import.");
+  const fieldIds = new Set((await q("SELECT id FROM fields")).rows.map(r => r.id));
+  const client = await pool.connect();
+  let created = 0, updated = 0, replacedPlaceholder = 0;
+  try {
+    await client.query("BEGIN");
+    for (const raw of items) {
+      const v = implVals(raw);
+      if (!v.system || !v.kind || !v.name) continue;
+      if (v.field_id && !fieldIds.has(v.field_id)) v.field_id = null;
+      const ex = await client.query("SELECT id FROM impls WHERE system=$1 AND container=$2 AND lower(name)=lower($3) LIMIT 1", [v.system, v.container, v.name]);
+      if (ex.rowCount) {
+        await client.query(`UPDATE impls SET field_id=COALESCE($1,field_id), kind=$2, label=$3, parent=$4, std=$5, state=$6,
+          description=CASE WHEN $7='' THEN description ELSE $7 END, by_user=$8, at=now() WHERE id=$9`,
+          [v.field_id, v.kind, v.label, v.parent, v.std, v.state, v.description, req.user.id, ex.rows[0].id]);
+        updated++; continue;
+      }
+      if (v.field_id) {
+        const ph = await client.query("SELECT id FROM impls WHERE system=$1 AND field_id=$2 AND (name LIKE '[%' OR (by_user IS NULL AND container='')) LIMIT 1", [v.system, v.field_id]);
+        if (ph.rowCount) {
+          await client.query(`UPDATE impls SET container=$1, kind=$2, name=$3, label=$4, parent=$5, std=$6, state=$7, description=$8, by_user=$9, at=now() WHERE id=$10`,
+            [v.container, v.kind, v.name, v.label, v.parent, v.std, v.state, v.description || "Imported; replaced a placeholder.", req.user.id, ph.rows[0].id]);
+          replacedPlaceholder++; continue;
+        }
+      }
+      await client.query(`INSERT INTO impls (field_id,system,container,kind,name,label,parent,std,state,description,by_user) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [v.field_id, v.system, v.container, v.kind, v.name, v.label, v.parent, v.std, v.state, v.description, req.user.id]);
+      created++;
+    }
+    await client.query(`INSERT INTO audit (by_user,entity,entity_id,action,detail) VALUES ($1,'import',$2,'imported',$3)`,
+      [req.user.id, String(items[0].system || ""), JSON.stringify({ system: items[0].system, container: items[0].container || "", created, updated, replacedPlaceholder })]);
+    await client.query("COMMIT");
+  } catch (e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
+  res.json({ created, updated, replacedPlaceholder });
+}));
+app.post("/api/impls/deprecate", auth, canWrite, wrap(async (req, res) => {
+  const ids = (Array.isArray(req.body.ids) ? req.body.ids : []).map(Number).filter(Boolean).slice(0, 1500);
+  if (!ids.length) return bad(res, "Nothing selected.");
+  await q("UPDATE impls SET state='deprecated', by_user=$1, at=now() WHERE id = ANY($2)", [req.user.id, ids]);
+  await audit(req, "impl", ids.join(","), "marked deprecated", { count: ids.length });
+  res.json({ ok: true });
+}));
 app.delete("/api/impls/:id", auth, canWrite, wrap(async (req, res) => {
   const r = await q("DELETE FROM impls WHERE id=$1 RETURNING system,name", [Number(req.params.id)]);
   if (r.rowCount) await audit(req, "impl", req.params.id, "deleted", r.rows[0]);
@@ -378,6 +423,7 @@ app.use((err, req, res, next) => {
 (async () => {
   await init();
   await seed();
+  await seedV2();
   await ensureAdmin();
   app.listen(PORT, () => console.log(`MarTech guide listening on ${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });
