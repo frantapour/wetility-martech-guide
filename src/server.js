@@ -307,8 +307,9 @@ app.post("/api/impls/bulk", auth, canWrite, wrap(async (req, res) => {
       const v = implVals(raw);
       if (!v.system || !v.kind || !v.name) continue;
       if (v.field_id && !fieldIds.has(v.field_id)) v.field_id = null;
+      // GTM tags, triggers and variables often share a name (a tag's event name = its trigger's event), so there the kind must match too.
       const ex = await client.query(`SELECT id FROM impls WHERE system=$1 AND container=$2 AND (lower(name)=lower($3) OR ($4<>'' AND lower(label)=lower($4)))
-        ORDER BY (lower(name)=lower($3)) DESC LIMIT 1`, [v.system, v.container, v.name, v.label]);
+        AND ($1<>'gtm' OR kind=$5) ORDER BY (lower(name)=lower($3)) DESC, (kind=$5) DESC LIMIT 1`, [v.system, v.container, v.name, v.label, v.kind]);
       if (ex.rowCount) {
         await client.query(`UPDATE impls SET field_id=COALESCE($1,field_id), kind=$2, label=$3, parent=CASE WHEN $4='' THEN parent ELSE $4 END, std=$5, state=$6,
           description=CASE WHEN $7='' THEN description ELSE $7 END, by_user=$8, at=now(), name=$10 WHERE id=$9`,
@@ -441,7 +442,6 @@ app.use((err, req, res, next) => {
   await seedV7();
   await seedV8();
   await seedV9();
-  await require("./diag")();
   await ensureAdmin();
   app.listen(PORT, () => console.log(`MarTech guide listening on ${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });

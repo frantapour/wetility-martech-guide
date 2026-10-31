@@ -290,8 +290,8 @@ async function merge(items, issues, uid, connId, report) {
     for (const it of items) {
       if (!it.name) continue;
       const sug = Importer.suggest({ name: it.name, label: it.label }, fieldDefs);
-      const ex = await client.query(`SELECT id FROM impls WHERE system=$1 AND container=$2 AND (lower(name)=lower($3) OR ($4<>'' AND lower(trim(label))=lower(trim($4))))
-        ORDER BY (lower(name)=lower($3)) DESC LIMIT 1`, [it.system, it.container, it.name, it.label || ""]);
+      const ex = await client.query(`SELECT id FROM impls WHERE system=$1 AND container=$2 AND (lower(name)=lower($3) OR ($4<>'' AND lower(trim(label))=lower(trim($4)))) AND ($1<>'gtm' OR kind=$5)
+        ORDER BY (lower(name)=lower($3)) DESC LIMIT 1`, [it.system, it.container, it.name, it.label || "", it.kind]);
       if (ex.rowCount) {
         await client.query(`UPDATE impls SET name=$1, label=CASE WHEN $2='' THEN label ELSE $2 END, kind=$3, parent=CASE WHEN $4='' THEN parent ELSE $4 END, field_id=COALESCE(field_id,$5),
           std=TRUE, state=CASE WHEN state IN ('deprecated','planned') THEN 'live' ELSE state END,
