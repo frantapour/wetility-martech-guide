@@ -50,6 +50,9 @@ async function googleTokenFromRefresh(c) {
 const ids = s => String(s || "").split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
 const digits = s => String(s || "").replace(/\D/g, "");
 
+// Freshsales returns untranslated keys for custom field groups, e.g. "Translation Missing: En.Fields.Cf Sales Funnel.Label".
+const groupName = g => { const m = String(g || "").match(/^Translation Missing: En\.Fields\.(?:Cf )?(.+?)\.Label$/i); return (m ? m[1] : String(g || "")).replace(/\s+/g, " ").trim(); };
+
 // ---------- connectors ----------
 // Each: id, name, systems, intro, fields [{key,label,secret,placeholder,help,type}], test(c) -> message, sync(c) -> {items, report, issues?}
 const CONNECTORS = [
@@ -65,8 +68,8 @@ const CONNECTORS = [
     async sync(c) {
       const items = [], report = [];
       const fieldItems = (json, container) => { const groups = Object.fromEntries((json.field_groups || []).map(g => [g.id, g.name]));
-        return (json.fields || []).filter(f => f && f.name).map(f => ({ system: "freshsales", container, kind: f.default === false || /^cf_/.test(f.name) ? "custom field" : "field", name: f.name, label: f.label && f.label !== f.name ? f.label : "",
-          parent: groups[f.field_group_id] || f.field_group?.name || "", description: ["Synced from Freshsales API", f.type && `type ${f.type}`, f.required && "required", Array.isArray(f.choices) && f.choices.length ? `${f.choices.length} choices` : ""].filter(Boolean).join(", ") })); };
+        return (json.fields || []).filter(f => f && f.name).map(f => ({ system: "freshsales", container, kind: f.default === false || /^cf_/.test(f.name) ? "custom field" : "field", name: f.name, label: f.label && f.label.trim() !== f.name ? f.label.trim() : "",
+          parent: groupName(groups[f.field_group_id] || f.field_group?.name || ""), description: ["Synced from Freshsales API", f.type && `type ${f.type}`, f.required && "required", Array.isArray(f.choices) && f.choices.length ? `${f.choices.length} choices` : ""].filter(Boolean).join(", ") })); };
       for (const [container, path] of [["Contacts", "/settings/contacts/fields?include=field_group"], ["Deals", "/settings/deals/fields?include=field_group"], ["Accounts", "/settings/sales_accounts/fields?include=field_group"]]) {
         try { const got = fieldItems(await this._call(c, path), container); items.push(...got); report.push({ part: container, ok: true, count: got.length }); }
         catch (e) { report.push({ part: container, ok: false, error: e.message }); if (e.status === 400) return { items, report }; }
@@ -287,7 +290,7 @@ async function merge(items, issues, uid, connId, report) {
     for (const it of items) {
       if (!it.name) continue;
       const sug = Importer.suggest({ name: it.name, label: it.label }, fieldDefs);
-      const ex = await client.query(`SELECT id FROM impls WHERE system=$1 AND container=$2 AND (lower(name)=lower($3) OR ($4<>'' AND lower(label)=lower($4)))
+      const ex = await client.query(`SELECT id FROM impls WHERE system=$1 AND container=$2 AND (lower(name)=lower($3) OR ($4<>'' AND lower(trim(label))=lower(trim($4))))
         ORDER BY (lower(name)=lower($3)) DESC LIMIT 1`, [it.system, it.container, it.name, it.label || ""]);
       if (ex.rowCount) {
         await client.query(`UPDATE impls SET name=$1, label=CASE WHEN $2='' THEN label ELSE $2 END, kind=$3, parent=CASE WHEN $4='' THEN parent ELSE $4 END, field_id=COALESCE(field_id,$5),
@@ -308,10 +311,11 @@ async function merge(items, issues, uid, connId, report) {
     await client.query(`INSERT INTO audit (by_user,entity,entity_id,action,detail) VALUES ($1,'import',$2,'synced from API',$3)`, [uid, connId, JSON.stringify({ created, updated, logged, report })]);
     await client.query("COMMIT");
   } catch (e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
-  const pairs = [...new Set(items.map(i => i.system + "\u0000" + i.container))].map(s => s.split("\u0000"));
+  // Only compare like with like: a sync of lifecycle stages says nothing about lifecycle statuses or stage rules.
+  const pairs = [...new Set(items.map(i => [i.system, i.container, i.kind].join("\u0000")))].map(s => s.split("\u0000"));
   let stale = [];
-  for (const [system, container] of pairs) {
-    const r = await q(`SELECT id,system,container,name,label FROM impls WHERE system=$1 AND container=$2 AND state<>'deprecated' AND NOT (id = ANY($3))`, [system, container, [...seen]]);
+  for (const [system, container, kind] of pairs) {
+    const r = await q(`SELECT id,system,container,name,label FROM impls WHERE system=$1 AND container=$2 AND kind=$3 AND state<>'deprecated' AND NOT (id = ANY($4))`, [system, container, kind, [...seen]]);
     stale = stale.concat(r.rows);
   }
   return { created, updated, logged, stale };
