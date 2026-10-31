@@ -1,0 +1,807 @@
+[
+ {
+  "name": "deal_name",
+  "label": "Deal Name",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "related_contacts",
+  "label": "Related contacts",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "csm_owner",
+  "label": "CSM Owner",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "sales_owner",
+  "label": "Sales owner",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "subscription_total",
+  "label": "Subscription Total",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "credit_score_lead",
+  "label": "Credit Score (Lead)",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "project_engineer",
+  "label": "Project Engineer",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "accounts",
+  "label": "Accounts",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "promotion",
+  "label": "Promotion",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "partnership_code",
+  "label": "Partnership Code",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "referrer_code",
+  "label": "Referrer Code",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "hello_peter_rating",
+  "label": "Hello Peter Rating",
+  "parent": "Basic Information"
+ },
+ {
+  "name": "industry_type",
+  "label": "Industry Type",
+  "parent": "Basic Information / Commercial Information"
+ },
+ {
+  "name": "commercial_owner",
+  "label": "Commercial Owner",
+  "parent": "Basic Information / Commercial Information"
+ },
+ {
+  "name": "product_category",
+  "label": "Product Category",
+  "parent": "Basic Information / Commercial Information"
+ },
+ {
+  "name": "sseg_status",
+  "label": "SSEG Status",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "deal_pipeline",
+  "label": "Deal pipeline",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "deal_stage",
+  "label": "Deal stage",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "lost_reason",
+  "label": "Lost reason",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "closed_date",
+  "label": "Closed date",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "credit_approved_systems",
+  "label": "Credit Approved Systems",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "credit_team_document_notes",
+  "label": "Credit Team Document Notes",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "deal_lost_after_credit_approval",
+  "label": "Deal Lost after Credit Approval",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "deal_lost_prior_to_credit_approval",
+  "label": "Deal Lost prior to Credit Approval",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "virtual_site_visit_date",
+  "label": "Virtual Site Visit Date",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "credit_team_credit_score",
+  "label": "Credit Team Credit Score",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "physical_site_visit_date",
+  "label": "Physical Site Visit Date",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "installer",
+  "label": "Installer",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "installation_start_date",
+  "label": "Installation Start Date",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "installation_end_date",
+  "label": "Installation End Date",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "installation_duration",
+  "label": "Installation Duration",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "term_start_coc_issued_on",
+  "label": "Term start / COC issued on",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "date_base_docs_submitted",
+  "label": "Date Base Docs Submitted",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "date_additional_docs_requested",
+  "label": "Date Additional Docs Requested",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "date_additional_docs_submitted",
+  "label": "Date Additional Docs Submitted",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "date_credit_approval_or_decline",
+  "label": "Date Credit Approval or Decline",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "body_corporate_approval_requirement",
+  "label": "Body Corporate Approval Requirement",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "spv_number",
+  "label": "SPV Number",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "sales_stream_owner",
+  "label": "Sales Stream Owner",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "luxe_flow",
+  "label": "Luxe Flow",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "svoc_id",
+  "label": "SVOC ID",
+  "parent": "Basic Information / Pipeline"
+ },
+ {
+  "name": "deal_value",
+  "label": "Deal value",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "pace_boosted",
+  "label": "PACE BOOSTED?",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "initiation_fee_deal",
+  "label": "Initiation Fee Deal?",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "intiation_fee_status",
+  "label": "Intiation Fee Status",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "sseg_required",
+  "label": "SSEG Required",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "dwelling_size",
+  "label": "Dwelling Size",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "planned_maintenance",
+  "label": "Planned Maintenance",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "pod",
+  "label": "POD",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "system_premise_type",
+  "label": "System Premise Type",
+  "parent": "Customer System Information"
+ },
+ {
+  "name": "meter_number",
+  "label": "Meter Number",
+  "parent": "Customer System Information / OneBill"
+ },
+ {
+  "name": "meter_type",
+  "label": "Meter Type",
+  "parent": "Customer System Information / OneBill"
+ },
+ {
+  "name": "one_bill_status",
+  "label": "One Bill Status",
+  "parent": "Customer System Information / OneBill"
+ },
+ {
+  "name": "customer_system",
+  "label": "Customer System",
+  "parent": "Customer System Information / OneBill"
+ },
+ {
+  "name": "one_bill_payment_date",
+  "label": "One Bill Payment Date",
+  "parent": "Customer System Information / OneBill"
+ },
+ {
+  "name": "one_bill_payment_status",
+  "label": "One Bill Payment Status",
+  "parent": "Customer System Information / OneBill"
+ },
+ {
+  "name": "initiation_fee_payment_status",
+  "label": "Initiation Fee Payment Status",
+  "parent": "Customer System Information / OneBill"
+ },
+ {
+  "name": "solar_address_same_as_physical",
+  "label": "Solar Address Same as Physical",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "street",
+  "label": "Street",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "city",
+  "label": "City",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "postal_code",
+  "label": "Postal Code",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "province_sa",
+  "label": "Province SA",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "landmark",
+  "label": "Landmark",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "country_territory",
+  "label": "Country (Territory)",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "solar_property_wifi",
+  "label": "Solar Property WiFi",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "solar_property_garage",
+  "label": "Solar Property Garage",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "customer_main_coc",
+  "label": "Customer Main CoC",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "employment_status",
+  "label": "Employment Status",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "property_ownership_status",
+  "label": "Property Ownership Status",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "property_insurance",
+  "label": "Property Insurance",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "married_or_in_community_of_property",
+  "label": "Married or in community of property",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "debit_order_date",
+  "label": "Debit Order Date",
+  "parent": "SignNow Contract Information / Address"
+ },
+ {
+  "name": "customer_coc_inspection",
+  "label": "Customer CoC Inspection",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "external_cabinet_i_e_outdoor_cabinet",
+  "label": "External Cabinet i.e Outdoor Cabinet",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "smart_geyser_control",
+  "label": "Smart Geyser Control",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "indoor_cabinet_cover",
+  "label": "Indoor Cabinet/Cover",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "battery_size",
+  "label": "Battery Size",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "battery_rating",
+  "label": "Battery Rating",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "number_of_batteries",
+  "label": "Number of Batteries",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "pv_panel_size",
+  "label": "PV Panel Size",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "number_of_pv_panels",
+  "label": "Number of PV Panels",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "payment_holiday_duration",
+  "label": "Payment Holiday Duration",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "number_of_household_members",
+  "label": "Number of household members",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "promotions",
+  "label": "Promotions",
+  "parent": "SignNow Contract Information / Additional Bundle Products"
+ },
+ {
+  "name": "copy_of_id",
+  "label": "Copy of ID",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "copy_of_spouse_s_id",
+  "label": "Copy of Spouse's ID",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "proof_of_address",
+  "label": "Proof of Address",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "3_most_recent_banks_statements_1",
+  "label": "3 Most Recent Banks Statements 1",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "3_most_recent_banks_statements_2",
+  "label": "3 Most Recent Banks Statements 2",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "3_most_recent_banks_statements_3",
+  "label": "3 Most Recent Banks Statements 3",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "3_months_pay_slips_1",
+  "label": "3 Months Pay Slips 1",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "3_months_pay_slips_2",
+  "label": "3 Months Pay Slips 2",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "3_months_pay_slips_3",
+  "label": "3 Months Pay Slips 3",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "copy_of_main_coc",
+  "label": "Copy of Main CoC",
+  "parent": "SignNow Contract Information / Attachments"
+ },
+ {
+  "name": "contract_signed",
+  "label": "Contract Signed",
+  "parent": "SignNow Contract Information / Tilly"
+ },
+ {
+  "name": "tilly_contract",
+  "label": "Tilly Contract",
+  "parent": "SignNow Contract Information / Tilly"
+ },
+ {
+  "name": "landlord_consent_obtained",
+  "label": "Landlord Consent Obtained",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "property_secure",
+  "label": "Property Secure",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "property_fence_or_wall",
+  "label": "Property Fence or Wall",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "property_gates",
+  "label": "Property Gates",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "property_gates_locked",
+  "label": "Property Gates Locked",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "property_access_control_system",
+  "label": "Property Access Control System",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "property_alarm_system",
+  "label": "Property Alarm System",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "property_cameras",
+  "label": "Property Cameras",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "property_security_lighting",
+  "label": "Property security Lighting",
+  "parent": "A2 Pay Contract Information / Solar Installation Property Information (LUXE)"
+ },
+ {
+  "name": "store_code",
+  "label": "Store Code",
+  "parent": "A2 Pay Contract Information / A2PAY Information"
+ },
+ {
+  "name": "stock_on_credit",
+  "label": "Stock on Credit",
+  "parent": "A2 Pay Contract Information / A2PAY Information"
+ },
+ {
+  "name": "stock_on_credit_value_r",
+  "label": "Stock on Credit Value (R)",
+  "parent": "A2 Pay Contract Information / A2PAY Information"
+ },
+ {
+  "name": "pos_required",
+  "label": "POS Required?",
+  "parent": "A2 Pay Contract Information / A2PAY Information"
+ },
+ {
+  "name": "project_name",
+  "label": "Project Name",
+  "parent": "Flare Information / Basic Project Details"
+ },
+ {
+  "name": "estimated_capex_zar",
+  "label": "Estimated Capex (ZAR)",
+  "parent": "Flare Information / Basic Project Details"
+ },
+ {
+  "name": "expected_construction_start_date",
+  "label": "Expected Construction Start Date",
+  "parent": "Flare Information / Basic Project Details"
+ },
+ {
+  "name": "expected_construction_end_date",
+  "label": "Expected Construction End Date",
+  "parent": "Flare Information / Basic Project Details"
+ },
+ {
+  "name": "flare_form_source",
+  "label": "Flare Form Source",
+  "parent": "Flare Information / Basic Project Details"
+ },
+ {
+  "name": "epc_seeking_financing",
+  "label": "EPC Seeking Financing",
+  "parent": "Flare Information / EPC Status and Financing"
+ },
+ {
+  "name": "pending_financing_terms_approved",
+  "label": "Pending Financing Terms Approved",
+  "parent": "Flare Information / EPC Status and Financing"
+ },
+ {
+  "name": "epc_has_conducted_project_for_customer",
+  "label": "EPC has conducted project for customer",
+  "parent": "Flare Information / EPC Status and Financing"
+ },
+ {
+  "name": "epc_type",
+  "label": "EPC Type",
+  "parent": "Flare Information / EPC Status and Financing"
+ },
+ {
+  "name": "expected_payback_period_years",
+  "label": "Expected Payback Period (Years)",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "battery_involvement",
+  "label": "Battery Involvement",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "battery_rating_kwh",
+  "label": "Battery Rating (kWh)",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "battery_oem",
+  "label": "Battery OEM",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "hybrid_inverter_rating_kw",
+  "label": "Hybrid Inverter Rating (kW)",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "hybrid_inverter_oem",
+  "label": "Hybrid Inverter OEM",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "solar_rating_kwp",
+  "label": "Solar Rating (kWp)",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "solar_panel_oem",
+  "label": "Solar Panel OEM",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "annual_energy_consumption_of_site_kwh",
+  "label": "Annual Energy Consumption of Site (kWh)",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "solar_production_range_based_on_helioscope_month",
+  "label": "Solar Production Range based on Helioscope (month)",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "lower_end_of_range",
+  "label": "Lower End of Range",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "higher_end_of_range",
+  "label": "Higher End of Range",
+  "parent": "Flare Information / Project Specifications"
+ },
+ {
+  "name": "estimated_capex_for_solar_panels_zar",
+  "label": "Estimated Capex for Solar Panels (ZAR)",
+  "parent": "Flare Information / Estimated Capital Expenditures (Capex)"
+ },
+ {
+  "name": "estimated_capex_for_hybrid_inverter_zar",
+  "label": "Estimated Capex for Hybrid Inverter (ZAR)",
+  "parent": "Flare Information / Estimated Capital Expenditures (Capex)"
+ },
+ {
+  "name": "estimated_capex_for_battery_zar",
+  "label": "Estimated Capex for Battery (ZAR)",
+  "parent": "Flare Information / Estimated Capital Expenditures (Capex)"
+ },
+ {
+  "name": "estimated_installation_capex_zar",
+  "label": "Estimated Installation Capex (ZAR)",
+  "parent": "Flare Information / Estimated Capital Expenditures (Capex)"
+ },
+ {
+  "name": "total_project_capex",
+  "label": "Total Project Capex",
+  "parent": "Flare Information / Estimated Capital Expenditures (Capex)"
+ },
+ {
+  "name": "monthly_subscription_fee",
+  "label": "Monthly Subscription Fee",
+  "parent": "Flare Information / Payment Details"
+ },
+ {
+  "name": "project_management_fee",
+  "label": "Project Management Fee",
+  "parent": "Flare Information / Payment Details"
+ },
+ {
+  "name": "o_m_fee",
+  "label": "O&M Fee",
+  "parent": "Flare Information / Payment Details"
+ },
+ {
+  "name": "escalation_rate",
+  "label": "Escalation Rate",
+  "parent": "Flare Information / Payment Details"
+ },
+ {
+  "name": "end_customer_s_company_name",
+  "label": "End-Customer's Company Name",
+  "parent": "Flare Information / End-Customer Details"
+ },
+ {
+  "name": "end_customer_s_company_registration_number",
+  "label": "End-Customer's Company Registration Number",
+  "parent": "Flare Information / End-Customer Details"
+ },
+ {
+  "name": "end_customer_director_s_first_name",
+  "label": "End-Customer Director’s First Name",
+  "parent": "Flare Information / End-Customer Details"
+ },
+ {
+  "name": "end_customer_director_s_last_name",
+  "label": "End-Customer Director’s Last Name",
+  "parent": "Flare Information / End-Customer Details"
+ },
+ {
+  "name": "end_customer_director_s_email_address",
+  "label": "End-Customer Director’s Email Address",
+  "parent": "Flare Information / End-Customer Details"
+ },
+ {
+  "name": "end_customer_director_s_phone_number",
+  "label": "End-Customer Director’s Phone Number",
+  "parent": "Flare Information / End-Customer Details"
+ },
+ {
+  "name": "battery_datasheet",
+  "label": "Battery Datasheet",
+  "parent": "Flare Information / Flare Attachments"
+ },
+ {
+  "name": "hybrid_inverter_datasheet",
+  "label": "Hybrid Inverter Datasheet",
+  "parent": "Flare Information / Flare Attachments"
+ },
+ {
+  "name": "solar_panel_datasheet",
+  "label": "Solar Panel Datasheet",
+  "parent": "Flare Information / Flare Attachments"
+ },
+ {
+  "name": "calculated_bill_savings_document",
+  "label": "Calculated Bill Savings Document",
+  "parent": "Flare Information / Flare Attachments"
+ },
+ {
+  "name": "helioscope_analysis",
+  "label": "Helioscope Analysis",
+  "parent": "Flare Information / Flare Attachments"
+ },
+ {
+  "name": "10_year_warranty_documents_for_inverter",
+  "label": "10-Year Warranty Documents for Inverter",
+  "parent": "Flare Information / Flare Attachments"
+ },
+ {
+  "name": "10_year_warranty_documents_for_battery",
+  "label": "10-Year Warranty Documents for Battery",
+  "parent": "Flare Information / Flare Attachments"
+ },
+ {
+  "name": "25_year_warranty_documents_for_solar_panels",
+  "label": "25-Year Warranty Documents for Solar Panels",
+  "parent": "Flare Information / Flare Attachments"
+ },
+ {
+  "name": "framework_contract_url",
+  "label": "Framework Contract URL",
+  "parent": "Flare Information / FLARE SignNow Contract Fields"
+ },
+ {
+  "name": "signnow_framework_contract_id",
+  "label": "SignNow Framework Contract ID",
+  "parent": "Flare Information / FLARE SignNow Contract Fields"
+ },
+ {
+  "name": "active_framework_contract",
+  "label": "Active Framework Contract",
+  "parent": "Flare Information / FLARE SignNow Contract Fields"
+ },
+ {
+  "name": "framework_signer",
+  "label": "Framework Signer",
+  "parent": "Flare Information / FLARE SignNow Contract Fields"
+ },
+ {
+  "name": "flare_contract_url",
+  "label": "Flare Contract URL",
+  "parent": "Flare Information / FLARE SignNow Contract Fields"
+ },
+ {
+  "name": "flare_signnow_contract_id",
+  "label": "Flare SignNow Contract ID",
+  "parent": "Flare Information / FLARE SignNow Contract Fields"
+ },
+ {
+  "name": "flare_active_contract",
+  "label": "Flare Active Contract",
+  "parent": "Flare Information / FLARE SignNow Contract Fields"
+ },
+ {
+  "name": "contract_signer",
+  "label": "Contract Signer",
+  "parent": "Flare Information / FLARE SignNow Contract Fields"
+ }
+]
