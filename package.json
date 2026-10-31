@@ -7,7 +7,7 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/db.js && node --check src/seed.js && node --check src/seed_v3.js && node --check public/importer.js && node --check public/app.js && node --check public/content.js"
+    "check": "node --check src/server.js && node --check src/db.js && node --check src/seed.js && node --check src/seed_v3.js && node --check src/seed_v4.js && node --check public/importer.js && node --check public/app.js && node --check public/content.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
