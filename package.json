@@ -1,0 +1,19 @@
+{
+  "name": "wetility-martech-guide",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Wetility MarTech implementation guide, knowledge base and tracking registry",
+  "main": "src/server.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/db.js && node --check src/seed.js && node --check public/app.js && node --check public/content.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "connect-pg-simple": "^9.0.1",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "pg": "^8.13.1"
+  }
+}
