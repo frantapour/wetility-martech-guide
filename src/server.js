@@ -6,6 +6,7 @@ const PgStore = require("connect-pg-simple")(session);
 const bcrypt = require("bcryptjs");
 const { pool, init, q } = require("./db");
 const { seed, seedV2, ensureAdmin } = require("./seed");
+const { seedV3 } = require("./seed_v3");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -300,11 +301,12 @@ app.post("/api/impls/bulk", auth, canWrite, wrap(async (req, res) => {
       const v = implVals(raw);
       if (!v.system || !v.kind || !v.name) continue;
       if (v.field_id && !fieldIds.has(v.field_id)) v.field_id = null;
-      const ex = await client.query("SELECT id FROM impls WHERE system=$1 AND container=$2 AND lower(name)=lower($3) LIMIT 1", [v.system, v.container, v.name]);
+      const ex = await client.query(`SELECT id FROM impls WHERE system=$1 AND container=$2 AND (lower(name)=lower($3) OR ($4<>'' AND lower(label)=lower($4)))
+        ORDER BY (lower(name)=lower($3)) DESC LIMIT 1`, [v.system, v.container, v.name, v.label]);
       if (ex.rowCount) {
-        await client.query(`UPDATE impls SET field_id=COALESCE($1,field_id), kind=$2, label=$3, parent=$4, std=$5, state=$6,
-          description=CASE WHEN $7='' THEN description ELSE $7 END, by_user=$8, at=now() WHERE id=$9`,
-          [v.field_id, v.kind, v.label, v.parent, v.std, v.state, v.description, req.user.id, ex.rows[0].id]);
+        await client.query(`UPDATE impls SET field_id=COALESCE($1,field_id), kind=$2, label=$3, parent=CASE WHEN $4='' THEN parent ELSE $4 END, std=$5, state=$6,
+          description=CASE WHEN $7='' THEN description ELSE $7 END, by_user=$8, at=now(), name=$10 WHERE id=$9`,
+          [v.field_id, v.kind, v.label, v.parent, v.std, v.state, v.description, req.user.id, ex.rows[0].id, v.name]);
         updated++; continue;
       }
       if (v.field_id) {
@@ -424,6 +426,7 @@ app.use((err, req, res, next) => {
   await init();
   await seed();
   await seedV2();
+  await seedV3();
   await ensureAdmin();
   app.listen(PORT, () => console.log(`MarTech guide listening on ${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });

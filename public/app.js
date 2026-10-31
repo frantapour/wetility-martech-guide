@@ -18,7 +18,7 @@ function lev(a, b) { const m = a.length, n = b.length; if (Math.abs(m - n) > 2) 
   for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
 
 const SYS = Object.fromEntries(SYSTEMS.map(s => [s.id, s]));
-const sysName = id => SYS[id]?.short || (id === "governance" ? "Governance" : id);
+const sysName = id => SYS[id]?.short || ({ governance: "Governance and privacy", native: "Native integrations" }[id] || id);
 const STEP_OPTS = [["todo", "Not started"], ["progress", "In progress"], ["done", "Done"], ["blocked", "Blocked"]];
 const TEST_OPTS = [["todo", "Not run"], ["pass", "Pass"], ["fail", "Fail"]];
 const GATE_OPTS = [["todo", "Pending"], ["progress", "In review"], ["approved", "Approved"], ["blocked", "Blocked"]];
@@ -61,7 +61,7 @@ function analyze() {
   const live = i => i.state !== "deprecated";
   const privacy = I.filter(i => { const f = fieldOf(i.field_id); return f && live(i) && ((f.pii === "sensitive" && NO_SENSITIVE.includes(i.system)) || (f.pii === "personal" && NO_PERSONAL.includes(i.system))); });
   const g = {}; I.filter(i => live(i) && i.field_id && !/^\[/.test(i.name)).forEach(i => { (g[[i.field_id, i.system, i.kind, norm(i.name)].join("|")] ??= []).push(i); });
-  const g3 = {}; I.filter(i => live(i) && i.field_id && !i.std && !/^\[/.test(i.name)).forEach(i => { (g3[[i.field_id, i.system, i.kind].join("|")] ??= []).push(i); });
+  const g3 = {}; I.filter(i => live(i) && i.field_id && !(i.system === "gtm" && i.kind === "tag") && !/^\[/.test(i.name)).forEach(i => { (g3[[i.field_id, i.system, i.kind].join("|")] ??= []).push(i); });
   const sameName = Object.values(g).filter(a => a.length > 1), sameKey = new Set(sameName.flat().map(i => i.id));
   const dups = [...sameName, ...Object.values(g3).filter(a => a.length > 1 && a.some(i => !sameKey.has(i.id)))];
   const g2 = {}; I.filter(i => live(i) && i.field_id && !i.std && !/^\[/.test(i.name)).forEach(i => { (g2[i.system + "|" + norm(i.name)] ??= []).push(i); });
@@ -412,6 +412,8 @@ function vFlow() {
   return `<div class="eyebrow">Data and tracking</div><h1>How data flows between systems</h1>
   <p class="muted">Left to right: where data is created, collected, made canonical, analysed and sent to ad platforms. Click a system to see everything recorded in it, grouped by container and type.</p>
   <div class="flowwrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Data flow between Wetility systems"><defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker></defs>${heads}${edges}${nodes}</svg></div>
+  <h2>Native connections between these systems</h2><p class="muted">Built-in connectors Wetility can use instead of custom code, and the ones that do not exist. From the knowledge base; editors keep them current.</p>
+  <div class="feed">${S.data.kb.filter(k => k.system === "native").map(k => `<a class="entry" href="#kb-${k.id}" style="text-decoration:none;color:inherit;display:block"><div class="h"><b>${esc(k.title)}</b>${kbBadge(k)}</div><p class="muted">${esc(k.summary.slice(0, 200))}${k.summary.length > 200 ? "…" : ""}</p></a>`).join("") || `<div class="empty">No native-integration articles yet.</div>`}</div>
   <h2>Name consistency at each hop</h2><p class="muted">For every connection, the fields recorded on both sides, and where the two systems use different names for the same thing (platform-required names excluded).</p>
   <div class="tbl"><table><tr><th>From</th><th>To</th><th>What travels</th><th>Shared fields</th><th>Different names</th></tr>${FLOWS.map(([a, b, w]) => { const h = hopStats(a, b);
     return `<tr><td><a href="#sys-${a}">${esc(sysName(a))}</a></td><td><a href="#sys-${b}">${esc(sysName(b))}</a></td><td>${esc(w)}</td><td class="n">${h.shared.length}</td><td>${h.mism.length ? h.mism.map(([f, ia, ib]) => `<a href="#f-${f.id}"><code>${esc(ia[0].name)}</code> vs <code>${esc(ib[0].name)}</code></a>`).join("<br>") : h.shared.length ? `<span class="pill ok">Consistent</span>` : `<span class="muted">–</span>`}</td></tr>`; }).join("")}</table></div>`;
@@ -459,7 +461,7 @@ function vKBEdit(id) {
   if (!canWrite()) return `<h1>View-only access</h1>`;
   return `<div class="eyebrow"><a href="#kb">Knowledge base</a></div><h1>${id ? "Edit article" : "New article"}</h1>
   <form class="f" data-form="kbedit" data-id="${esc(id || "")}">
-  <div class="two"><label for="kt">Title<input id="kt" name="title" required maxlength="200" value="${esc(k.title)}"></label><label for="ks">System<select id="ks" name="system">${[...SYSTEMS, { id: "governance", name: "Governance and privacy" }].map(s => `<option value="${s.id}" ${s.id === k.system ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label></div>
+  <div class="two"><label for="kt">Title<input id="kt" name="title" required maxlength="200" value="${esc(k.title)}"></label><label for="ks">System<select id="ks" name="system">${[...SYSTEMS, { id: "governance", name: "Governance and privacy" }, { id: "native", name: "Native integrations" }].map(s => `<option value="${s.id}" ${s.id === k.system ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label></div>
   <label for="ksum">Summary<textarea id="ksum" name="summary" maxlength="3000">${esc(k.summary)}</textarea></label>
   <label for="kst">Steps (one per line)<textarea id="kst" name="steps" rows="8">${esc((k.steps || []).join("\n"))}</textarea></label>
   <label for="kpr">Good practice (one per line)<textarea id="kpr" name="practices">${esc((k.practices || []).join("\n"))}</textarea></label>
@@ -556,7 +558,7 @@ function vActivity() {
 
 // ---------- view: import current setup ----------
 const HOWTO = {
-  freshsales: "Admin Settings > Module customisation > Contacts (or Deals) > Fields: select the whole field layout, copy and paste it here. Repeat for Deals and Accounts with the module name in Container. For API names (cf_...), export the fields as CSV and use the CSV format.",
+  freshsales: "Best: the Freshsales fields API (/api/settings/contacts/fields?include=field_group) saved as JSON gives the real field keys; choose 'Freshsales fields API (JSON)'. Quick: Admin Settings > Module customisation > Contacts > Fields, copy the whole layout and paste it. Repeat for Deals and Accounts with the module name in Container.",
   gtm: "Admin > Export container > choose the latest published version > Export. Upload the JSON file here (format: GTM container export). Tags, triggers and variables are imported with what they fire on.",
   ga4: "Admin > Data display > Events: copy the event names (one per line). Repeat with Custom definitions for parameters, choosing type 'event parameter'.",
   firebase: "Firebase console > Analytics > Events, or GA4 Admin for the app stream: copy the event names.",
@@ -583,8 +585,8 @@ function vImport() {
   <p class="muted">Bring in the fields, events, tags and variables that exist today, system by system. Matching standard fields are suggested; you confirm before anything is saved. Importing the same system and container again updates items instead of duplicating them.</p>
   <form class="f" id="impform">
    <div class="two"><label for="imsys">System<select id="imsys" data-imp="system">${SYSTEMS.map(s => `<option value="${s.id}" ${s.id === m.system ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
-   <label for="imfmt">What you are pasting<select id="imfmt" data-imp="format"><option value="list" ${m.format === "list" ? "selected" : ""}>Copied list or field layout (one per line)</option><option value="csv" ${m.format === "csv" ? "selected" : ""}>CSV with a header row</option><option value="gtm" ${m.format === "gtm" ? "selected" : ""}>GTM container export (JSON)</option></select></label></div>
-   <div class="box info" style="margin:0"><b>Where to get it from ${esc(sysName(m.system))}</b>${esc(HOWTO[m.system] || "Copy the list of names from the tool's settings, one per line.")}</div>
+   <label for="imfmt">What you are pasting<select id="imfmt" data-imp="format"><option value="list" ${m.format === "list" ? "selected" : ""}>Copied list or field layout (one per line)</option><option value="csv" ${m.format === "csv" ? "selected" : ""}>CSV with a header row</option><option value="gtm" ${m.format === "gtm" ? "selected" : ""}>GTM container export (JSON)</option><option value="freshsales" ${m.format === "freshsales" ? "selected" : ""}>Freshsales fields API (JSON)</option></select></label></div>
+   <div class="box info" style="margin:0"><b>Where to get it from ${esc(sysName(m.system))}</b>${esc(HOWTO[m.system] || "Copy the list of names from the tool's settings, one per line.")}${S.data.kb.some(k => k.id === "export-" + m.system) ? ` <a href="#kb-export-${m.system}">Step-by-step export guide</a>` : ""}</div>
    <div class="two"><label for="imcont">Container, module or property (keeps re-imports separate)<input id="imcont" data-imp="container" value="${esc(m.container)}" placeholder="e.g. Contacts, Deals, GTM-N9XFQZMK"></label>
    <label for="imkind">Type for every item (GTM export sets its own)<input id="imkind" data-imp="kind" list="imkl" value="${esc(m.kind)}"><datalist id="imkl">${(SYS[m.system]?.kinds || []).map(k => `<option value="${esc(k)}">`).join("")}</datalist></label></div>
    <div class="two"><label for="imst">Status<select id="imst" data-imp="state"><option value="live" ${m.state === "live" ? "selected" : ""}>Live (set up today)</option><option value="planned" ${m.state === "planned" ? "selected" : ""}>Planned</option></select></label>
@@ -611,7 +613,7 @@ function impPreview() {
   const m = S.imp; m.result = null;
   let parsed;
   try {
-    parsed = m.format === "gtm" ? Importer.parseGTM(m.text) : m.format === "csv" ? Importer.parseCSV(m.text) : Importer.parseList(m.text, { container: m.container, labelsAreNames: !["freshsales", "zuper", "respond", "credit"].includes(m.system) });
+    parsed = m.format === "freshsales" ? Importer.parseFreshsales(m.text) : m.format === "gtm" ? Importer.parseGTM(m.text) : m.format === "csv" ? Importer.parseCSV(m.text) : Importer.parseList(m.text, { container: m.container, labelsAreNames: !["freshsales", "zuper", "respond", "credit"].includes(m.system) });
   } catch (e) { toast(e.message); return; }
   if (!parsed.items.length) { toast("Nothing recognisable to import. Check the format."); return; }
   if (!m.container && parsed.container) m.container = parsed.container;
@@ -627,7 +629,7 @@ async function impSave() {
 document.addEventListener("input", e => { const k = e.target.dataset?.imp; if (k && S.imp && k === "text") S.imp.text = e.target.value; });
 document.addEventListener("change", e => {
   const el = e.target; if (!S.imp) return;
-  if (el.id === "imfile" && el.files[0]) { const r = new FileReader(); r.onload = () => { S.imp.text = String(r.result); if (/\.json$/i.test(el.files[0].name)) S.imp.format = "gtm"; else if (/\.csv$/i.test(el.files[0].name)) S.imp.format = "csv"; render(true); }; r.readAsText(el.files[0]); return; }
+  if (el.id === "imfile" && el.files[0]) { const r = new FileReader(); r.onload = () => { S.imp.text = String(r.result); if (/\.json$/i.test(el.files[0].name)) S.imp.format = S.imp.system === "freshsales" ? "freshsales" : "gtm"; else if (/\.csv$/i.test(el.files[0].name)) S.imp.format = "csv"; render(true); }; r.readAsText(el.files[0]); return; }
   const k = el.dataset.imp;
   if (k) { S.imp[k] = el.type === "checkbox" ? el.checked : el.value; if (k === "system" || k === "format") { S.imp.rows = null; if (k === "system") { S.imp.kind = SYS[el.value]?.kinds?.[0] || "field"; S.imp.fixed = ["freshsales", "zuper", "respond", "credit", "gads", "meta", "tiktok", "branch"].includes(el.value); } render(true); } return; }
   if (el.dataset.impOn != null) { S.imp.rows[+el.dataset.impOn].on = el.checked; render(true); return; }

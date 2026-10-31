@@ -23,7 +23,7 @@ const SYNONYMS = {
 };
 
 function suggest(item, fields) {
-  const keys = [item.name, item.label].map(norm).filter(Boolean);
+  const keys = [item.name, String(item.name || "").replace(/^cf_/i, ""), item.label].map(norm).filter(Boolean);
   const live = fields.filter(f => f.status !== "deprecated");
   for (const k of keys) {
     const exact = live.find(f => norm(f.name) === k || (f.aliases || []).some(a => norm(a) === k));
@@ -109,6 +109,18 @@ function parseGTM(text) {
   return { container, items };
 }
 
-const api = { norm, slug, suggest, parseList, parseCSV, parseGTM, SYNONYMS };
+// Freshsales: GET /api/settings/{contacts|deals|sales_accounts}/fields?include=field_group
+function parseFreshsales(text) {
+  let j; try { j = JSON.parse(text); } catch (e) { throw new Error("That is not valid JSON. Save the API response from /api/settings/contacts/fields?include=field_group as a .json file."); }
+  const fields = Array.isArray(j) ? j : j.fields || [];
+  const groups = Object.fromEntries((j.field_groups || []).map(g => [g.id, g.name]));
+  const items = fields.filter(f => f && f.name).map(f => ({
+    name: f.name, label: f.label && f.label !== f.name ? f.label : "", kind: f.default === false || /^cf_/.test(f.name) ? "custom field" : "field",
+    parent: groups[f.field_group_id] || f.field_group_name || "", description: [f.type && "Type " + f.type, f.required && "required"].filter(Boolean).join(", ")
+  }));
+  return { container: "", items };
+}
+
+const api = { norm, slug, suggest, parseList, parseCSV, parseGTM, parseFreshsales, SYNONYMS };
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Importer = api;
 })(typeof window !== "undefined" ? window : globalThis);
