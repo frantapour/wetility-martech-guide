@@ -390,3 +390,99 @@ mark{background:rgba(255,199,9,.28);color:inherit;border-radius:3px;padding:0 1p
 .impl .t code,.impl .t .cell{white-space:normal;overflow-wrap:anywhere}
 .impl .acts{flex-wrap:wrap}
 .login .art{justify-content:center;gap:40px}
+
+/* ---------- clarity pass (Nov 2026): only tappable things look tappable ---------- */
+.tile.flat{background:transparent;border:0;box-shadow:none;padding:6px 4px}
+.tile.link{cursor:pointer;font:inherit;text-align:left;width:100%;position:relative}
+.tile.link .go{margin-left:auto;flex:none;color:var(--muted)}
+.tile.link:hover,.tile.link:active{border-color:var(--sun-line)}
+.tile.link:hover .go{color:var(--y)}
+.hero .stats a{display:block;text-decoration:none;color:#000;border-radius:10px;margin:-4px -6px;padding:4px 6px}
+.hero .stats a:hover,.hero .stats a:active{background:rgba(0,0,0,.08)}
+.nextcard>a.t{display:block;min-width:0}
+.regcards,.flowlist{display:none}
+.regcard{padding:12px 14px;margin-bottom:10px}
+.regcard .rc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--fg);padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.regcard .rc-head b{font-size:16px;display:block;overflow-wrap:anywhere}
+.regcard .rc-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;padding:5px 0;align-items:start}
+.regcard .rc-sys{color:var(--muted);font-size:14px}
+.regcard .rc-cells{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.regcard .cell{white-space:normal;overflow-wrap:anywhere}
+.flowlist h3{margin:18px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--y)}
+.fl-nodes{display:grid;gap:8px}
+.moreh{margin:22px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--y)}
+.morelist{display:grid;gap:8px}
+.morei{display:flex;align-items:center;gap:12px;padding:14px 16px}
+.morei>.ico:first-child{color:var(--y);flex:none}
+.morei .l{font-size:14.5px;color:var(--muted)}
+.morei .l b{font-size:16.5px;color:var(--fg)}
+
+/* ---------- phone: fit the screen, bigger text ---------- */
+@media (max-width:900px){
+  html{-webkit-text-size-adjust:100%}
+  body{font-size:16.5px;line-height:1.55;overflow-x:hidden}
+  main.content,.wrap,#view{max-width:100%;overflow-x:hidden}
+  #view *{max-width:100%}
+  #view svg.ico{max-width:none}
+  h1{font-size:28px;line-height:1.2;overflow-wrap:anywhere}
+  h2{font-size:21px}
+  p,li{overflow-wrap:anywhere}
+  code{font-size:14.5px;white-space:normal;overflow-wrap:anywhere}
+  .muted,.lede{font-size:16px}
+  .by,.pill,.cell,.kbbadge,small,label,.tile .l,.tl-row,.legend,.step .tools .btn,.impl .acts .btn,.seg button,.seg-tabs button,.tabs .count{font-size:14.5px!important}
+  .eyebrow,h5,.subnav h5{font-size:13px!important}
+  .btn,button.btn,a.btn{font-size:16px;min-height:44px;padding:10px 16px}
+  .btn.sm{min-height:40px;font-size:15px}
+  input,select,textarea{font-size:16px!important;max-width:100%}
+  [style*="font-size:11"],[style*="font-size:12"],[style*="font-size:13"]{font-size:14.5px!important}
+  [style*="max-width:220px"]{max-width:100%!important}
+  /* section chips and tabs wrap instead of sliding sideways */
+  .mobsub{flex-wrap:wrap;overflow:visible;gap:8px;margin:-4px 0 18px}
+  .mobsub a{font-size:15px;padding:8px 14px}
+  .tabs{flex-wrap:wrap;overflow:visible;gap:6px;border-bottom:0;margin:20px 0 16px}
+  .tabs button{border:1px solid var(--line);border-radius:999px;margin:0;padding:8px 14px;font-size:15px;background:var(--surface)}
+  .tabs button.on{background:var(--y);color:#000;border-color:var(--y)}
+  .tabs button.on .count{background:rgba(0,0,0,.15);color:#000}
+  .seg{flex-wrap:wrap}
+  .acts{flex-wrap:wrap}
+  .filters{flex-wrap:wrap}
+  .filters>*{flex:1 1 100%}
+  /* hero */
+  .hero h1{font-size:28px}
+  .hero .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+  .hero .stats div b,.hero .stats a b{font-size:30px}
+  .hero .stats a span{font-size:15px!important}
+  .hero::after{width:48px;height:40px;right:18px;top:18px}
+  /* tiles: one per row so labels never squeeze */
+  .tiles{grid-template-columns:1fr 1fr}
+  .tiles .tile.link{grid-column:1/-1}
+  /* registry and flow: cards and lists instead of wide tables and diagrams */
+  .regwrap,.flowwrap{display:none}
+  .regcards,.flowlist{display:block}
+  /* any other table stacks into blocks */
+  .tbl{overflow:visible;border:0;background:transparent;box-shadow:none}
+  .tbl table,.tbl tbody,.tbl tr,.tbl td{display:block;width:auto}
+  .tbl tr:has(th){display:none}
+  .tbl tr{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;margin-bottom:10px}
+  .tbl td{border:0!important;padding:3px 0!important;overflow-wrap:anywhere}
+  .tbl td:empty{display:none}
+  /* bottom bar: bigger labels and touch targets */
+  .bottomnav a{font-size:12px;min-width:62px;padding:6px 4px}
+  .bottomnav .ico.lg{width:26px;height:26px}
+  .bottomnav .badge{font-size:11px;min-width:18px;height:18px}
+  .crumbs{font-size:15px;min-width:0}
+  .crumbs b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .impl .t{flex-wrap:wrap}
+  .step .txt,.row .txt{overflow-wrap:anywhere}
+}
+.hero .stats a b{display:block}
+#view svg{flex-shrink:0}
+@media (max-width:900px){
+  .mobsub{display:block;margin:2px 0 18px}
+  .mobpick{position:relative;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:0 14px;min-height:50px}
+  .mobpick>span{color:var(--y);font-weight:600;font-size:13px!important;letter-spacing:.06em;text-transform:uppercase;flex:none}
+  .mobpick select{appearance:none;-webkit-appearance:none;flex:1;min-width:0;background:transparent;border:0;color:var(--fg);font-weight:600;padding:12px 26px 12px 0;text-overflow:ellipsis}
+  .mobpick .ico{position:absolute;right:14px;pointer-events:none;color:var(--muted)}
+}
+@media (max-width:900px){.fl-nodes{grid-template-columns:1fr 1fr}.fl-nodes .tile{padding:12px}}
+h2[id]{scroll-margin-top:84px}

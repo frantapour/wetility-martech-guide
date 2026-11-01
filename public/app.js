@@ -203,11 +203,11 @@ function vOverview() {
     .filter(x => x.at).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 7);
   return `<section class="hero"><div class="eyebrow">${new Date().toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" })}</div>
   <h1>${greet}, ${esc((S.me.name || "").split(" ")[0])}</h1><p>${filterMe ? `Showing ${esc(filterMe)}'s playbooks.` : "The MarTech programme at a glance."} ${all.d} of ${all.n} playbook steps done.</p>
-  <div class="stats"><div><b>${Math.round(all.d / all.n * 100)}%</b><span>Steps done</span></div><div><b>${gatesOk}/7</b><span>Gates approved</span></div><div><b>${openIssues}</b><span>Open problems</span></div><div><b>${S.A.score == null ? "–" : S.A.score + "%"}</b><span>Tracking names consistent</span></div></div>
+  <div class="stats"><a href="#playbooks"><b>${Math.round(all.d / all.n * 100)}%</b><span>Steps done ›</span></a><a href="#gates"><b>${gatesOk}/7</b><span>Gates approved ›</span></a><a href="#issues"><b>${openIssues}</b><span>Open problems ›</span></a><a href="#consistency"><b>${S.A.score == null ? "–" : S.A.score + "%"}</b><span>Names consistent ›</span></a></div>
   <div class="focus"><label for="iam2" style="font-size:13px;color:#B9C6DA">Focus on</label><select id="iam2" data-focus="1"><option value="">Everyone</option>${PEOPLE.map(n => `<option ${n === filterMe ? "selected" : ""}>${n}</option>`).join("")}</select></div></section>
   <div class="cols"><div>
    <h2>${icon("target")} Next steps</h2>
-   <div class="next">${ns.length ? ns.map(({ p, i, v, pr }) => `<div class="card nextcard">${ring(pr.d / pr.n * 100, 46)}<div class="t"><b><a href="#${p.id}" style="color:inherit;text-decoration:none">${p.no} ${esc(p.title)}</a></b><div class="s">Step ${i + 1}: ${esc(p.steps[i])}</div>${v !== "todo" ? `<span class="pill ${v === "blocked" ? "bad" : "sun"}" style="margin-top:6px">${v === "blocked" ? "Blocked" : "In progress"}</span>` : ""}</div>
+   <div class="next">${ns.length ? ns.map(({ p, i, v, pr }) => `<div class="card nextcard">${ring(pr.d / pr.n * 100, 46)}<a class="t" href="#${p.id}" style="color:inherit;text-decoration:none"><b>${p.no} ${esc(p.title)}</b><div class="s">Step ${i + 1}: ${esc(p.steps[i])}</div>${v !== "todo" ? `<span class="pill ${v === "blocked" ? "bad" : "sun"}" style="margin-top:6px">${v === "blocked" ? "Blocked" : "In progress"}</span>` : ""}</a>
      <div class="acts" style="flex-direction:column;align-items:stretch">${canWrite() ? (v === "todo" ? `<button class="btn sm" data-act="set-state" data-key="${p.id}-s${i + 1}" data-v="progress">${icon("play", "sm")}Start</button>` : `<button class="btn sm primary" data-act="set-state" data-key="${p.id}-s${i + 1}" data-v="done">${icon("check", "sm")}Done</button>`) : ""}<a class="btn sm ghost" href="#${p.id}">Open</a></div></div>`).join("") : `<div class="empty">${icon("check")}Nothing left to do${filterMe ? " in " + esc(filterMe) + "'s playbooks" : ""}.</div>`}</div>
    <h2>${icon("calendar")} Workstream timeline</h2>
    <div class="card timeline"><div class="tl-axis"><div></div><div><span>Week 1</span><span>Week 7</span><span>Week 14</span></div></div>
@@ -312,6 +312,21 @@ function vIssues() {
 }
 
 // ---------- views: tracking registry ----------
+// A stat that leads somewhere is a link with a chevron; one that does not is plain text, so nothing looks tappable unless it is.
+function tile(n, l, go) {
+  if (!go) return `<div class="tile flat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  const inner = `<div class="n">${n}</div><div class="l">${l}</div>${icon("chev", "sm go")}`;
+  return go.startsWith("#") ? `<a class="tile link" href="${go}">${inner}</a>` : `<button class="tile link" data-act="scrollto" data-t="${go}">${inner}</button>`;
+}
+const secId = t => "sec-" + String(t).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+function fieldCard(f) {
+  const A = S.A, impls = (A.byField[f.id] || []).filter(i => i.state !== "deprecated");
+  const rows = SYSTEMS.map(s => { const here = impls.filter(i => i.system === s.id);
+    if (here.length) return `<div class="rc-row"><span class="rc-sys">${esc(s.short)}</span><span class="rc-cells">${here.map(chip).join(" ")}</span></div>`;
+    if ((f.expected || []).includes(s.id)) return `<div class="rc-row"><span class="rc-sys">${esc(s.short)}</span><span class="rc-cells"><span class="cell c-missing">missing</span></span></div>`;
+    return ""; }).join("");
+  return `<div class="card regcard"><a class="rc-head" href="#f-${f.id}"><span><b>${esc(f.name)}</b><span class="by">${esc(f.kind)}${f.pii !== "none" ? ` · <span class="${f.pii === "sensitive" ? "sev-high" : ""}">${esc(f.pii)}</span>` : ""}</span></span>${icon("chev", "sm")}</a>${rows || `<div class="by" style="padding:6px 0">Not recorded in any system yet.</div>`}</div>`;
+}
 function fieldRow(f) {
   const A = S.A, impls = (A.byField[f.id] || []).filter(i => i.state !== "deprecated");
   let first = {};
@@ -331,13 +346,14 @@ function vRegistry() {
   const layerCounts = LAYERS.map(l => [l, SYSTEMS.filter(s => s.layer === l).length]);
   return `<div class="eyebrow">Data and tracking</div><h1>Tracking registry</h1>
   <p class="muted">One row per canonical event or field, one column per system, ordered by how data flows. Each cell shows the name used in that system. Click a field to see what it measures, where it is implemented, and to align names.</p>
-  <div class="tiles"><div class="tile"><div class="n">${S.data.fields.filter(f => f.status !== "deprecated").length}</div><div class="l">Canonical fields</div></div><div class="tile"><div class="n">${S.data.impls.length}</div><div class="l">Items across systems</div></div><div class="tile"><div class="n">${A.score == null ? "–" : A.score + "%"}</div><div class="l">Names consistent</div></div><div class="tile"><div class="n">${A.problems}</div><div class="l"><a href="#consistency">Problems to fix</a></div></div></div>
+  <div class="tiles">${tile(S.data.fields.filter(f => f.status !== "deprecated").length, "Canonical fields")}${tile(S.data.impls.length, "Items across systems", "#flow")}${tile(A.score == null ? "–" : A.score + "%", "Names consistent", "#consistency")}${tile(A.problems, "Problems to fix", "#consistency")}</div>
   <div class="filters"><input id="regq" type="search" placeholder="Filter by name, alias, GTM label or container" value="${esc(S.regQ || "")}" aria-label="Filter registry">
    <select id="regkind" aria-label="Type"><option value="">All types</option>${["event", "identifier", "parameter", "attribute"].map(k => `<option ${kind === k ? "selected" : ""}>${k}</option>`).join("")}</select>
    <select id="regprob" aria-label="Problems"><option value="">All fields</option><option value="1" ${prob ? "selected" : ""}>Only fields with problems</option></select>
    ${canWrite() ? `<a class="btn primary" href="#import">Import current setup</a><a class="btn" href="#add">Add one item</a>` : ""}<a class="btn" href="/api/export/registry.csv">Download CSV</a></div>
   <div class="legend"><span><span class="cell c-consistent">name</span>Consistent</span><span><span class="cell c-platform">name</span>Platform-required name</span><span><span class="cell c-differs">name</span>Name differs</span><span><span class="cell c-pending">name</span>Rename pending</span><span><span class="cell c-unconfirmed">name</span>To confirm</span><span><span class="cell c-dup">name</span>Duplicate</span><span><span class="cell c-privacy">name</span>Privacy conflict</span><span><span class="cell c-missing">missing</span>Expected, not recorded</span></div>
-  <div class="tbl"><table class="regtbl"><tr><th rowspan="2">Canonical field</th>${layerCounts.map(([l, n]) => `<th class="layer" colspan="${n}">${l}</th>`).join("")}</tr><tr>${SYSTEMS.map(s => `<th><a href="#sys-${s.id}">${esc(s.short)}</a></th>`).join("")}</tr>
+  <div class="regcards">${fields.map(fieldCard).join("") || `<div class="empty">No fields match.</div>`}</div>
+  <div class="tbl regwrap"><table class="regtbl"><tr><th rowspan="2">Canonical field</th>${layerCounts.map(([l, n]) => `<th class="layer" colspan="${n}">${l}</th>`).join("")}</tr><tr>${SYSTEMS.map(s => `<th><a href="#sys-${s.id}">${esc(s.short)}</a></th>`).join("")}</tr>
   ${fields.map(fieldRow).join("") || `<tr><td colspan="${SYSTEMS.length + 1}" class="muted">No fields match.</td></tr>`}</table></div>
   ${A.unmapped.length ? `<h2>Items not mapped to a canonical field</h2><p class="muted">Map each to an existing field, or create a canonical field if it is genuinely new.</p>${A.unmapped.map(unmappedRow).join("")}` : ""}`;
 }
@@ -430,12 +446,12 @@ function vAdd() {
 }
 function vConsistency() {
   const A = S.A;
-  const sec = (title, why, items, row) => `<h2>${title} <span class="muted" style="font:400 14px var(--f-body)">${items.length}</span></h2><p class="muted">${why}</p>${items.length ? items.map(row).join("") : `<div class="empty">None.</div>`}`;
+  const sec = (title, why, items, row) => `<h2 id="${secId(title)}">${title} <span class="muted" style="font:400 14px var(--f-body)">${items.length}</span></h2><p class="muted">${why}</p>${items.length ? items.map(row).join("") : `<div class="empty">None.</div>`}`;
   const implLine = (i, extra = "") => { const f = A.fieldOf(i.field_id); return `<div class="impl"><div class="t"><b>${esc(sysName(i.system))}</b><span class="muted">${esc(i.kind)}</span>${chip(i)}${f ? `<span class="muted">→</span><a href="#f-${f.id}"><code>${esc(f.name)}</code></a>` : ""}${i.label ? `<span class="muted" style="font-size:12.5px">${esc(i.label)}</span>` : ""}</div>${extra}</div>`; };
   const acts = i => canWrite() ? `<div class="acts">${A.code[i.id] === "pending" ? `<button class="btn primary" data-act="renamed" data-id="${i.id}">Renamed in ${esc(sysName(i.system))}</button>` : `<button class="btn" data-act="align" data-id="${i.id}">Align to canonical</button>`}<button class="btn" data-act="std-on" data-id="${i.id}">Name is fixed</button></div>` : "";
   return `<div class="eyebrow">Data and tracking</div><h1>Consistency check</h1>
   <p class="muted">Recalculated from the registry every time it changes. Work top to bottom: privacy first, then duplicates, then names.</p>
-  <div class="tiles"><div class="tile"><div class="n">${A.score == null ? "–" : A.score + "%"}</div><div class="l">Names consistent (mapped items)</div></div><div class="tile"><div class="n">${A.privacy.length}</div><div class="l">Privacy conflicts</div></div><div class="tile"><div class="n">${A.dups.length + A.collisions.length + A.similar.length}</div><div class="l">Duplicates</div></div><div class="tile"><div class="n">${A.naming.length + A.pending.length}</div><div class="l">Names to align</div></div><div class="tile"><div class="n">${A.missing.length}</div><div class="l">Gaps</div></div></div>
+  <div class="tiles">${tile(A.score == null ? "–" : A.score + "%", "Names consistent (mapped items)")}${tile(A.privacy.length, "Privacy conflicts", secId("Privacy conflicts"))}${tile(A.dups.length + A.collisions.length + A.similar.length, "Duplicates", secId("Duplicate implementations"))}${tile(A.naming.length + A.pending.length, "Names to align", secId("Names that differ from the canonical name"))}${tile(A.missing.length, "Gaps", secId("Gaps: expected but not recorded"))}</div></div>
   ${sec("Privacy conflicts", "Data classed as sensitive or personal recorded in a browser, analytics or ad-platform system. Fix or get Information Officer approval.", A.privacy, i => implLine(i, `<div class="muted" style="font-size:13px">${esc(i.description)}</div>`))}
   ${sec("Duplicate implementations", "Two items in one system for the same canonical field (for example two Freshsales fields both holding the meter number), or the same item recorded twice. Keep one; deprecate or migrate the other.", A.dups, g => `<div class="box warn">${g.map(i => implLine(i)).join("")}</div>`)}
   ${sec("Name collisions", "The same name in one system used for two different canonical fields. One of them needs a different name.", A.collisions, g => `<div class="box warn">${g.map(i => implLine(i)).join("")}</div>`)}
@@ -471,6 +487,7 @@ function vFlow() {
   const heads = LAYERS.map((l, i) => `<text class="lh" x="${i * colW + colW / 2}" y="20" text-anchor="middle">${l}</text>`).join("");
   return `<div class="eyebrow">Data and tracking</div><h1>How data flows between systems</h1>
   <p class="muted">Left to right: where data is created, collected, made canonical, analysed and sent to ad platforms. Click a system to see everything recorded in it, grouped by container and type.</p>
+  <div class="flowlist">${LAYERS.map(l => `<h3>${l}</h3><div class="fl-nodes">${SYSTEMS.filter(s => s.layer === l).map(s => `<a class="tile link" href="#sys-${s.id}"><div class="l"><b style="color:var(--fg);font-size:16px">${esc(s.short)}</b><br>${counts[s.id]} item${counts[s.id] === 1 ? "" : "s"}</div>${icon("chev", "sm go")}</a>`).join("")}</div>`).join("")}</div>
   <div class="flowwrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Data flow between Wetility systems"><defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker></defs>${heads}${edges}${nodes}</svg></div>
   <h2>Native connections between these systems</h2><p class="muted">Built-in connectors Wetility can use instead of custom code, and the ones that do not exist. From the knowledge base; editors keep them current.</p>
   <div class="feed">${S.data.kb.filter(k => k.system === "native").map(k => `<a class="entry" href="#kb-${k.id}" style="text-decoration:none;color:inherit;display:block"><div class="h"><b>${esc(k.title)}</b>${kbBadge(k)}</div><p class="muted">${esc(k.summary.slice(0, 200))}${k.summary.length > 200 ? "…" : ""}</p></a>`).join("") || `<div class="empty">No native-integration articles yet.</div>`}</div>
@@ -746,6 +763,18 @@ function vSettings() {
 }
 const connSet = v => { S.conns = S.conns.map(c => c.id === v.id ? v : c); };
 
+// ---------- view: more (phone menu) ----------
+function vMore() {
+  const openI = S.data.issues.filter(x => x.state === "open").length;
+  const item = (href, ic, t, sub, extra = "") => `<a class="tile link morei" href="${href}">${icon(ic)}<div class="l"><b>${t}</b>${sub ? `<br>${sub}` : ""}</div>${extra}${icon("chev", "sm go")}</a>`;
+  const btn = (act, ic, t) => `<button class="tile link morei" data-act="${act}">${icon(ic)}<div class="l"><b>${t}</b></div>${icon("chev", "sm go")}</button>`;
+  return `<h1>More</h1>
+  <h3 class="moreh">Knowledge</h3><div class="morelist">${item("#kb", "bulb", "Vendor guidance", "Current step-by-step guides per platform")}${item("#ref", "table", "Schema & naming rules", "How events and fields must be named")}</div>
+  <h3 class="moreh">Results</h3><div class="morelist">${item("#issues", "alert", "Problems and fixes", `${openI} open`)}${item("#results", "chart", "Results & KPIs", "Is the implementation delivering?")}${item("#log", "log", "Implementation log", "What was done, when, by whom")}</div>
+  ${isAdmin() ? `<h3 class="moreh">Admin</h3><div class="morelist">${item("#settings", "key", "Settings & connections", "API keys and syncs")}${item("#admin", "shield", "People and access", "Invite people, roles")}${item("#activity", "log", "Activity", "Every change, newest first")}</div>` : ""}
+  <h3 class="moreh">Account</h3><div class="morelist">${item("#password", "key", "Change password", esc(S.me.email))}${btn("logout", "logout", "Sign out")}</div>`;
+}
+
 // ---------- shell ----------
 const AREAS = [
   { id: "home", label: "Home", icon: "home", href: "#overview" },
@@ -760,6 +789,7 @@ function areaOf(h) {
   if (h === "kb" || h.startsWith("kb-") || h === "ref") return "kb";
   if (["results", "log", "issues"].includes(h)) return "results";
   if (["admin", "activity", "password", "settings"].includes(h)) return "admin";
+  if (h === "more") return "more";
   return "home";
 }
 function subnav(area) {
@@ -780,9 +810,9 @@ function titleOf(h) {
   if (h.startsWith("kb-")) return S.data.kb.find(k => k.id === h.slice(3))?.title || "Article";
   return { overview: "Home", playbooks: "All playbooks", read: "Read this first", gates: "Gates", ws: "Workstreams", qa: "QA test cases", approval: "Final approval", day1: "Day-one tasks", esc: "Escalation & cadence",
     registry: "Tracking registry", consistency: "Consistency check", flow: "Data flow", import: "Import current setup", add: "Add one item", kb: "Vendor guidance", ref: "Schema & naming rules",
-    results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", settings: "Settings & connections", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
+    results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", settings: "Settings & connections", more: "More", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
 }
-const VIEWS = { overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings };
+const VIEWS = { overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings, more: vMore };
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (S.me?.must_change) return () => vPassword(true);
@@ -815,10 +845,15 @@ function renderNav() {
   const groups = subnav(area);
   $("#subnav").innerHTML = groups.map(([h, items]) => `<h5>${h}</h5>` + items.map(([id, l, p, n]) => { const pr = p ? pbProgress(p) : null;
     return `<a href="#${id}" class="${id === c ? "on" : ""}">${p ? `<span class="no">${p.no}</span>` : ""}<span class="t">${esc(l)}</span>${p && isMine(p.owner) ? `<span class="mine" title="Yours"></span>` : ""}${pr ? `<span class="no" style="width:auto">${pr.d}/${pr.n}</span>` : n ? `<span class="badge">${n}</span>` : ""}</a>`; }).join("")).join("");
-  $("#mobsub").innerHTML = area === "home" ? "" : groups.flatMap(([, items]) => items).filter(([id, , p]) => !p).map(([id, l]) => `<a href="#${id}" class="${id === c ? "on" : ""}">${esc(l)}</a>`).join("");
-  $("#bottomnav").innerHTML = AREAS.map(a => `<a href="${a.href}" class="${a.id === area ? "on" : ""}">${icon(a.icon, "lg")}<span>${a.label}</span>${a.id === "results" && openI ? `<span class="badge">${openI}</span>` : ""}</a>`).join("");
+  // Phone: one compact "where am I / go to" picker instead of rows of chips.
+  const mitems = groups.flatMap(([g, items]) => items.map(([id, l, p]) => [id, p ? `${p.no} ${l}` : l, g]));
+  const AREA_LABEL = { plan: "Playbooks", track: "Tracking", kb: "Knowledge", results: "Results", admin: "Admin" };
+  $("#mobsub").innerHTML = area === "home" || area === "more" || !mitems.length ? "" : `<label class="mobpick"><span>${AREA_LABEL[area] || "Section"}</span><select data-nav="1" aria-label="Go to page in ${AREA_LABEL[area] || "this section"}">${mitems.some(([id]) => id === c) ? "" : `<option value="" selected>${esc(titleOf(c))}</option>`}${groups.map(([g, items]) => `<optgroup label="${esc(g)}">${items.map(([id, l, p]) => `<option value="${id}" ${id === c ? "selected" : ""}>${esc(p ? p.no + " " + l : l)}</option>`).join("")}</optgroup>`).join("")}</select>${icon("chev-down", "sm")}</label>`;
+  const bkey = c === "issues" ? "problems" : ["kb", "results", "admin", "more"].includes(area) ? "more" : area;
+  $("#bottomnav").innerHTML = [["home", "Home", "home", "#overview"], ["plan", "Playbooks", "book", "#playbooks"], ["track", "Tracking", "radar", "#registry"], ["problems", "Problems", "alert", "#issues"], ["more", "More", "menu", "#more"]]
+    .map(([id, l, ic, href]) => `<a href="${href}" class="${id === bkey ? "on" : ""}" ${id === bkey ? 'aria-current="page"' : ""}>${icon(ic, "lg")}<span>${l}</span>${id === "problems" && openI ? `<span class="badge">${openI}</span>` : ""}</a>`).join("");
   const A2 = areas.find(a => a.id === area);
-  $("#crumbs").innerHTML = area === "home" && c === "overview" ? `<b>Home</b>` : `<a href="${A2?.href || "#overview"}">${A2?.label || "Home"}</a>${icon("chev")}<b>${esc(titleOf(c))}</b>`;
+  $("#crumbs").innerHTML = area === "home" && c === "overview" ? `<b>Home</b>` : c === "more" ? `<b>More</b>` : `<a href="${A2?.href || "#overview"}">${A2?.label || "Home"}</a>${icon("chev")}<b>${esc(titleOf(c))}</b>`;
   document.title = titleOf(c) + " · Wetility MarTech";
 }
 function renderMenu() {
@@ -898,6 +933,7 @@ document.addEventListener("input", e => {
   if (e.target.id === "regq") { clearTimeout(S._rt); S._rt = setTimeout(() => { S.regQ = e.target.value; const pos = e.target.selectionStart; render(); const el = $("#regq"); el.focus(); el.setSelectionRange(pos, pos); }, 200); }
 });
 document.addEventListener("change", async e => {
+  if (e.target.matches("select[data-nav]")) { if (e.target.value) location.hash = e.target.value; return; }
   const el = e.target;
   if (el.id === "pick") { location.hash = el.value; return; }
   if (el.id === "iam" || el.dataset.focus) { filterMe = el.value || null; try { filterMe ? localStorage.setItem("mt_me", filterMe) : localStorage.removeItem("mt_me"); } catch (_) {} render(true); return; }
@@ -951,6 +987,7 @@ document.addEventListener("click", async e => {
   if (act === "cmdk-all") { closeCmdk(); return; }
   if (act === "menu") { S.menu = !S.menu; renderMenu(); return; }
   if (act === "go") { S.menu = false; renderMenu(); location.hash = b.dataset.h; return; }
+  if (act === "scrollto") { document.getElementById(b.dataset.t)?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (act === "pbtab") { S.pbTab[b.dataset.pb] = b.dataset.tab; S.inline = null; render(true); return; }
   if (act === "inline") { S.inline = S.inline === b.dataset.k ? null : b.dataset.k || null; render(true); setTimeout(() => document.querySelector("#view .inline input:not([type=hidden]), #view .inline textarea")?.focus(), 0); return; }
   if (act === "kbf") { S.kbF = b.dataset.f; render(true); return; }
