@@ -252,6 +252,18 @@ const CONNECTORS = [
         } catch (e) { report.push({ part: `Account ${digits(cid)}`, ok: false, error: e.message }); }
       }
       return { items, report }; }
+  },
+  {
+    id: "website", name: "Website crawl (wetility.energy)", systems: ["umbraco"],
+    intro: "Reads the public website: robots.txt, sitemap and up to 80 pages. Lists the tracking code found in each page's HTML (outside GTM too), external script sources, titles, H1s, canonicals, share images, structured data and word counts. Never submits forms.",
+    fields: [{ key: "domain", label: "Website domain", placeholder: "wetility.energy", default: "wetility.energy", help: "Just the domain. The crawl takes up to two minutes." }],
+    async test(c) { const r = await fetch("https://" + String(c.domain).replace(/^https?:\/\//, "").replace(/\/.*$/, "") + "/", { headers: { "User-Agent": "WetilityMarTechGuide/1.0" } }); if (!r.ok) throw fail(`The website returned ${r.status}.`); return `Website reachable (HTTP ${r.status}).`; },
+    async sync(c) {
+      const out = await require("./crawler").crawl(c.domain || "wetility.energy");
+      console.log("CRAWL", JSON.stringify({ robots: out.robots, sitemapCount: out.sitemapCount, issues: out.issues }));
+      for (let i = 0; i < out.pages.length; i += 10) console.log("CRAWLPAGES", JSON.stringify(out.pages.slice(i, i + 10)));
+      return { items: out.items, report: out.report };
+    }
   }
 ];
 const BY_ID = Object.fromEntries(CONNECTORS.map(c => [c.id, c]));
