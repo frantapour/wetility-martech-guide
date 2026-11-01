@@ -207,7 +207,9 @@ function vOverview() {
   <div class="focus"><label for="iam2" style="font-size:13px;color:#B9C6DA">Focus on</label><select id="iam2" data-focus="1"><option value="">Everyone</option>${PEOPLE.map(n => `<option ${n === filterMe ? "selected" : ""}>${n}</option>`).join("")}</select></div></section>
   <div class="cols"><div>
    <a class="tile link starthere" href="#arch">${icon("target")}<div class="l"><b>Start here: target architecture</b><br>${GAPS.filter(g => st("gap-" + g[0]) === "done").length} of ${GAPS.length} gaps closed. What to fix, in what order, and why</div>${icon("chev", "sm go")}</a>
-   <h2>${icon("target")} Next steps</h2>
+   <h2>${icon("check")} Next actions</h2>
+   ${actionsBlock(5)}
+   <h2>${icon("target")} Playbook steps</h2>
    <div class="next">${ns.length ? ns.map(({ p, i, v, pr }) => `<div class="card nextcard">${ring(pr.d / pr.n * 100, 46)}<a class="t" href="#${p.id}" style="color:inherit;text-decoration:none"><b>${p.no} ${esc(p.title)}</b><div class="s">Step ${i + 1}: ${esc(p.steps[i])}</div>${v !== "todo" ? `<span class="pill ${v === "blocked" ? "bad" : "sun"}" style="margin-top:6px">${v === "blocked" ? "Blocked" : "In progress"}</span>` : ""}</a>
      <div class="acts" style="flex-direction:column;align-items:stretch">${canWrite() ? (v === "todo" ? `<button class="btn sm" data-act="set-state" data-key="${p.id}-s${i + 1}" data-v="progress">${icon("play", "sm")}Start</button>` : `<button class="btn sm primary" data-act="set-state" data-key="${p.id}-s${i + 1}" data-v="done">${icon("check", "sm")}Done</button>`) : ""}<a class="btn sm ghost" href="#${p.id}">Open</a></div></div>`).join("") : `<div class="empty">${icon("check")}Nothing left to do${filterMe ? " in " + esc(filterMe) + "'s playbooks" : ""}.</div>`}</div>
    <h2>${icon("calendar")} Workstream timeline</h2>
@@ -777,7 +779,7 @@ const ARCH_THEMES = [
     ["Confirm Wetility owns the Meta pixel 331051689290488 and TikTok pixel D0ESSGJC77U75NH4NU60 (playbooks 4.2, 4.3).", "Delete the Dark Matter Amplitude project once it is empty and unused.", "Remove the 74 paused GTM tags and the live (TEST) tags after exporting the container.", "Archive the Legacy Wetility Pipeline; set stage probabilities from real conversion rates."],
     "Every pixel, ad account and analytics project sits in a Wetility-owned account, and nothing unused is left running."]
 ];
-const SPECIALIST = "Digital marketing specialist (from 7 Nov)";
+const SPECIALIST = "Thato (digital marketing specialist, from 7 Nov)";
 // Gaps between today and the target, in the order that reaches the best solution fastest:
 // risk first (cheap, no dependencies), then the decisions that block building, then the build, then optimisation. Clean-up runs alongside.
 const GAPS = [
@@ -811,7 +813,7 @@ function gapsBlock() {
   const done = GAPS.filter(g => st("gap-" + g[0]) === "done").length, label = Object.fromEntries(STEP_OPTS);
   const phases = [...new Set(GAPS.map(g => g[6]))];
   return `<h2 id="a-gaps">${icon("flow")} Gaps to close, in order</h2>
-  <p class="muted">Risks first (cheap, nothing blocks them), then the decisions that block the build, then the build, then optimisation; clean-up runs alongside. The new digital marketing specialist owns most of the build from 7 November. Tap a gap for detail and to update it. <b>${done} of ${GAPS.length} closed.</b></p>
+  <p class="muted">Risks first (cheap, nothing blocks them), then the decisions that block the build, then the build, then optimisation; clean-up runs alongside. Thato, the digital marketing specialist starting on 7 November, owns most of the build. Tap a gap for detail and to update it. <b>${done} of ${GAPS.length} closed.</b></p>
   ${phases.map(ph => `<h3 class="gphase">${esc(ph)}</h3><div class="gaps">${GAPS.filter(g => g[6] === ph).map(([id, t, why, who, eff, needs, when, k]) => { const v = st("gap-" + id); return `<details class="card gap${v === "done" ? " done" : ""}" data-open-key="gap-${id}" ${S.secOpen?.["gap-" + id] ? "open" : ""}><summary><span class="gid">${id}</span><b>${esc(t)}</b><span class="pill gst st-${v}">${label[v] || v}</span></summary>
    <div class="gbody"><div class="gm"><span class="pill ${GAP_KIND[k][0]}">${GAP_KIND[k][1]}</span>${needs ? `<span class="pill">Needs ${esc(needs)} first</span>` : ""}</div>
    <p class="by">${esc(why)}</p><p class="by"><b>Owner:</b> ${esc(who)} · <b>Effort:</b> ${esc(eff)}</p><div>${sel("gap-" + id, STEP_OPTS)}</div></div></details>`; }).join("")}</div>`).join("")}`;
@@ -820,8 +822,8 @@ const ACCESS = [
   ["meta", "Meta Business portfolio", "Business settings: People, Partners, System users; then each ad account, pixel 331051689290488 and Page", "Agencies as Partners only, not personal invites; at least 2 Wetility admins with two-factor; system-user tokens owned by Wetility"],
   ["tiktok", "TikTok Business Center", "Members, Partners; pixel D0ESSGJC77U75NH4NU60 and ad accounts", "Agency as Partner with the least role; Wetility owns the Business Center"],
   ["gads", "Google Ads (AW-11401670719)", "Admin → Access and security: users, and manager accounts linked to the account", "Remove unknown manager-account links; agency access through their manager account with Standard, not Admin"],
-  ["ga4", "GA4 and Firebase", "GA4 Admin → Account and Property access management; Firebase project → Users and permissions", "Viewer for most; Editor only for the specialist; check linked products (Google Ads, BigQuery)"],
-  ["gtm", "Google Tag Manager (GTM-N9XFQZMK)", "Admin → User management, account and container", "Publish rights only for the specialist and one backup; agencies Read or Edit without Publish"],
+  ["ga4", "GA4 and Firebase", "GA4 Admin → Account and Property access management; Firebase project → Users and permissions", "Viewer for most; Editor only for Thato; check linked products (Google Ads, BigQuery)"],
+  ["gtm", "Google Tag Manager (GTM-N9XFQZMK)", "Admin → User management, account and container", "Publish rights only for Thato and one backup; agencies Read or Edit without Publish"],
   ["gcloud", "Google Cloud (service accounts and keys)", "IAM, and Service accounts → Keys", "Delete keys nobody can explain; keep martech-guide (read-only) and note its owner"],
   ["freshsales", "Freshsales", "Admin settings → Users; integrations (social integration via Kopano, Power BI connector)", "API keys belong to users: deactivating a user kills their key, so check integrations first; restrict sensitive fields by role"],
   ["respond", "respond.io", "Settings → Users; Integrations → Developer API tokens; webhooks", "Delete tokens without an owner; remove leavers"],
@@ -845,6 +847,38 @@ function accessBlock() {
   <div class="gaps">${ACCESS.map(([k, name, where, rule]) => { const v = st("acc-" + k); return `<details class="card gap${v === "done" ? " done" : ""}" data-open-key="acc-${k}" ${S.secOpen?.["acc-" + k] ? "open" : ""}><summary><span class="gid">${icon("key", "sm")}</span><b>${esc(name)}</b><span class="pill gst st-${v}">${label[v] || v}</span></summary>
    <div class="gbody"><p class="by"><b>Where to look:</b> ${esc(where)}</p><p class="by"><b>Target:</b> ${esc(rule)}</p><div>${sel("acc-" + k, STEP_OPTS)}</div></div></details>`; }).join("")}</div></details>
 `;
+}
+// Actions with owners and due dates (1 Nov 2026). Status is stored per action (act-A1 ...).
+const ACTIONS = [
+  ["A1", "2026-11-02", "Send DarkMatter the questions on Meta and TikTok", "Franta, to Kopano (DarkMatter)", "Meta: which lead event each campaign optimises on (Lead, META_Submitted_Lead, meta_form_submitted); why Consent Granted = True; whose cloud account hosts capig.wetility.energy; whether anything depends on Growth Charter's access; move Facebook app 904269519251906 and its dataset to Wetility. TikTok: who sends the server Lead events; which event campaigns optimise on; what the Event Builder rules match; Wetility Admin access on pixel D0ESSGJC77U75NH4NU60. Tell them privacy settings will change.", "G2, G5, G23, G24"],
+  ["A2", "2026-11-02", "Finish the Zuper sync (webhooks)", "Franta", "Settings & connections → Zuper → Sync now, then tell Claude so the webhook address can be fixed.", ""],
+  ["A3", "2026-11-04", "Restrict bank, ID and credit fields in Freshsales", "Josh", "Limit the fields to the roles that need them. First check which reports and integrations (Power BI, Kopano social integration) use them.", "G1"],
+  ["A4", "2026-11-06", "Stop holding bank, ID, income and credit data in respond.io", "Josh", "Keep these in the credit and billing systems only; leave a reference (freshsales_id) in respond.io. Limit who can export contacts and messages.", "G1"],
+  ["A5", "2026-11-06", "Information Officer decisions", "Information Officer (Franta raises)", "(1) May credit-derived signals (620+, credit approved) go to ad platforms? (2) Meta on-device measurement: stay in or opt out, before 12 November. (3) Meta and TikTok automatic advanced matching and 'detailed page info' / 'enhanced data postback'. (4) The Let's talk form bundling credit-check consent into one tick.", "G3"],
+  ["A6", "2026-11-06", "Check Google Ads and GTM ownership and access", "Franta or Reeza", "Google Ads → Admin → Access and security (users and linked managers). GTM → Admin → User management (account and container). Record owners in the access review.", "G4, G5"],
+  ["A7", "2026-11-06", "Check who owns TikTok ad account 7455352392268169232 and pixel CVH6OG3C77U2AAG9KD8G", "Franta", "TikTok Business Center → Assets. If the second pixel is Wetility's, it becomes the Wetility pixel (gap G23).", "G23"],
+  ["A8", "2026-11-06", "Access review: remove leavers and unknown users", "Franta with each platform admin", "Use the access review on the Target architecture page. Reduce agencies to the minimum role; remove them only after handover.", "G5"],
+  ["A9", "2026-11-06", "Revoke the API keys used for syncs", "Franta", "Remove keys in the app, then revoke them in Freshsales, Amplitude, Google Cloud and Zuper (after A2).", ""],
+  ["A10", "2026-11-09", "Remove Growth Charter from the Meta dataset; set the privacy switches", "Reeza (Product Growth and Marketing Lead)", "After DarkMatter confirms nothing depends on Growth Charter. Then apply the Information Officer's decisions and add a traffic allow list (wetility.energy, capig.wetility.energy).", "G2, G5"],
+  ["A11", "2026-11-07", "Onboard Thato (digital marketing specialist)", "Franta, with Reeza", "Walk through the Target architecture page. Editor access in GTM, GA4, Google Ads, Meta and TikTok, all through Wetility-owned accounts; editor role in this guide.", ""],
+  ["A12", "2026-11-11", "Baseline and rollback triggers", "Thato", "4 weeks of daily Freshsales leads by source, cost per lead per platform and platform-reported conversions.", "G9"],
+  ["A13", "2026-11-13", "Draft the event spine and event_id rule for sign-off", "Thato; Franta signs off", "Six events, parameters (product, value), event_id, click IDs captured (gclid, ctwa_clid added).", "G7"],
+  ["A14", "2026-11-13", "One session recorder, with form fields masked", "Thato", "Choose between Clarity, Hotjar and Amplitude replay; mask ID, phone, email and address fields.", "G6"],
+  ["A15", "2026-11-13", "Decide the join key: phone number or contract_id", "Josh, Beryl, Timothy", "One meeting; record the decision in playbook 4.5.", "G8"],
+  ["A16", "2026-11-14", "Value inputs", "Finance (customer value per product); Josh or sales operations (Freshsales funnel report)", "Installed-customer contribution per product; monthly volumes and conversion rates per step. Thato fills in the value table.", "G10"],
+  ["A17", "2026-11-19", "Build the Wetility-owned TikTok pixel and Meta app dataset alongside the current ones", "Thato", "Before the 20 November freeze: add the new pixel in GTM (report only); connect a Wetility app dataset in Branch if DarkMatter will not move theirs.", "G23, G24"],
+  ["A18", "2026-11-19", "Ask the app team what changed on 19 to 20 October and add Purchase with value", "App developer (Branch owner)", "App events to Meta jumped five-fold; completed purchases are not sent.", ""],
+  ["A19", "2026-12-15", "Website fixes after the freeze", "Web developer (Palota) with Thato", "One H1 per page, newsroom crawlable with canonicals, share images, zoom allowed, aligned savings claims, WhatsApp links with a reference, separate consent ticks on Let's talk.", ""]
+];
+function actionsBlock(limit) {
+  const today = new Date().toISOString().slice(0, 10), label = Object.fromEntries(STEP_OPTS);
+  const open = ACTIONS.filter(a => st("act-" + a[0]) !== "done"), done = ACTIONS.length - open.length;
+  const list = limit ? open.slice(0, limit) : ACTIONS;
+  const fmt = d => new Date(d + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" });
+  return `<div class="gaps">${list.map(([id, due, t, who, how, gaps]) => { const v = st("act-" + id), late = v !== "done" && due < today;
+    return `<details class="card gap act${v === "done" ? " done" : ""}" data-open-key="act-${id}" ${S.secOpen?.["act-" + id] ? "open" : ""}><summary><span class="gid">${id}</span><b>${esc(t)}</b><span class="pill gst st-${v}">${label[v] || v}</span><span class="actmeta"><span class="${late ? "sev-high" : ""}">${late ? "Overdue: " : "Due "}${fmt(due)}</span> · ${esc(who)}</span></summary>
+    <div class="gbody"><p class="by">${esc(how)}</p>${gaps ? `<p class="by"><b>Closes:</b> ${esc(gaps)}</p>` : ""}<div>${sel("act-" + id, STEP_OPTS)}</div></div></details>`; }).join("")}</div>
+  ${limit ? `<p class="by" style="margin-top:6px">${done} of ${ACTIONS.length} done. <a href="#arch">All actions and owners</a></p>` : ""}`;
 }
 const SPINE = [
   ["lead_submitted", "Lead submitted", "Website, app or WhatsApp form accepted by the backend", "Browser tag plus server event, same event_id"],
@@ -873,7 +907,10 @@ function vArch() {
   ];
   return `<div class="eyebrow">Start here</div><h1>Target architecture</h1>
   <p class="lede">Almost every problem in this guide has one root cause: nobody owns a single definition of the customer journey, so each platform, agency and developer tracked it their own way. The fix is to define the journey once and send that same definition everywhere.</p>
-  <div class="archnav">${[["a-gaps", "Gaps to close"], ["a-bcp", "Safe transition"], ["a-acc", "Access review"], ["a-spine", "The journey"], ["a-flow", "How data flows"], ["a-cmp", "Best practice vs today"], ["a-pri", "Priorities"], ["a-sig", "Funnel signals"], ["a-val", "Conversion values"], ["a-seq", "What happens when"], ["a-dec", "Decisions needed"]].map(([id, l]) => `<button class="pill" data-act="scrollto" data-t="${id}">${l}</button>`).join("")}</div>
+  <div class="archnav">${[["a-act", "Actions and owners"], ["a-gaps", "Gaps to close"], ["a-bcp", "Safe transition"], ["a-acc", "Access review"], ["a-spine", "The journey"], ["a-flow", "How data flows"], ["a-cmp", "Best practice vs today"], ["a-pri", "Priorities"], ["a-sig", "Funnel signals"], ["a-val", "Conversion values"], ["a-seq", "What happens when"], ["a-dec", "Decisions needed"]].map(([id, l]) => `<button class="pill" data-act="scrollto" data-t="${id}">${l}</button>`).join("")}</div>
+  <h2 id="a-act">${icon("check")} Actions and owners</h2>
+  <p class="muted">Who does what next, in date order. Tap an action for detail and to update it. The gaps below explain why.</p>
+  ${actionsBlock(0)}
   ${gapsBlock()}
   <details class="asec" id="a-bcp" ${S.secOpen?.["a-bcp"] === false ? "" : "open"}><summary><h2>${icon("shield")} Safe transition and business continuity</h2></summary>
   <div class="box warn"><b>Leads must not drop because of tracking changes</b>The Black Friday offer runs until 19 January. Until then nothing that drives bidding changes: no change to primary conversions, optimisation events or bid strategies. Everything new is built alongside the old setup and only reported. The switch happens after 19 January, one platform at a time, with a rollback ready.</div>
@@ -890,7 +927,7 @@ function vArch() {
    <li>Freshsales leads per day more than 20% below the same weekday's 4-week average for 2 days in a row: roll back the last change the same day.</li>
    <li>A platform's reported conversions fall more than 30% while Freshsales leads hold: it is a tracking fault, not a demand drop; fix or roll back the tag before touching campaigns.</li>
    <li>Cost per Freshsales lead on a platform rises more than 25% for 5 days after a switch: move budget back to the old ad sets or conversion.</li></ul>
-   <p class="by" style="margin:6px 0 0"><b>Who:</b> the specialist runs the change and the daily check; Franta approves each switch and any rollback; the agency is told 48 hours before every change to campaigns they run.</p></div>
+   <p class="by" style="margin:6px 0 0"><b>Who:</b> Thato runs the change and the daily check; Franta approves each switch and any rollback; the agency is told 48 hours before every change to campaigns they run.</p></div>
   <div class="box"><b>Before each change, a 5-point check</b><ul class="tight"><li>What changes, on which platform, and is it reported only or used for bidding?</li><li>Baseline for the last 4 weeks noted (Freshsales leads by source, cost per lead).</li><li>Rollback written down and tested (previous GTM version number, old conversion still active).</li><li>Not during a freeze window or a campaign launch.</li><li>Logged in this guide (Implementation log) with the date, so any later drop can be traced to it.</li></ul></div>
   </details>
 
@@ -937,7 +974,7 @@ function vArch() {
   <details class="asec" id="a-seq" ${S.secOpen?.["a-seq"] ? "open" : ""}><summary><h2>${icon("calendar")} What happens when</h2></summary>
   <ol class="seq">
    <li><b>Now, before 7 November:</b> risk fixes that do not touch bidding (Freshsales field access, Meta consent, credit-signal decision, pixel ownership).</li>
-   <li><b>Week of 7 November (specialist starts):</b> baseline and rollback triggers, event spine and join key signed off, value inputs requested, session recording masked.</li>
+   <li><b>Week of 7 November (Thato starts):</b> baseline and rollback triggers, event spine and join key signed off, value inputs requested, session recording masked.</li>
    <li><b>November to December:</b> build the new setup alongside the old one and report it only. Nothing old is removed and no bidding changes. Freeze from 20 November to 5 December except risk fixes.</li>
    <li><b>December:</b> server events and postbacks sent as secondary conversions, with values, and checked against Freshsales.</li>
    <li><b>From 20 January (after the Black Friday offer ends):</b> switch bidding one platform at a time (Google, then Meta, then TikTok), a week apart, with the rollback triggers watched daily.</li>

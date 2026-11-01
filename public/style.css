@@ -553,3 +553,6 @@ ol.seq{padding-left:20px}ol.seq li{margin:8px 0}
 .gap>summary::after{content:"";position:absolute;right:14px;top:18px;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
 .gap[open]>summary::after{transform:rotate(-135deg);top:22px}
 .box li b,.box p b{display:inline;margin:0}
+.gap.act>summary{grid-template-columns:auto minmax(0,1fr) auto}
+.gap.act .actmeta{grid-column:2/-1;font-size:13px;color:var(--muted);font-weight:400}
+@media (max-width:900px){.gap.act .actmeta{font-size:14px!important;grid-column:2}}
