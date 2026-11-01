@@ -201,9 +201,10 @@ const CONNECTORS = [
     async test(c) { const j = await this._a(c, "/api/2/taxonomy/event"); return `Connected. ${(j.data || []).length} event types in the tracking plan.`; },
     async sync(c) { const items = [], report = [];
       const part = async (label, path, fn) => { try { const j = await this._a(c, path); (j.data || []).forEach(fn); report.push({ part: label, ok: true, count: (j.data || []).length }); } catch (e) { report.push({ part: label, ok: false, error: e.message }); } };
-      await part("Event types", "/api/2/taxonomy/event", e => items.push({ system: "amplitude", container: "Tracking plan", kind: "event", name: e.event_type, label: e.display_name || "", parent: e.category?.name || "", description: `${e.description || ""} ${e.is_active === false ? "(inactive)" : ""} Synced from Amplitude.`.trim() }));
-      await part("Event properties", "/api/2/taxonomy/event-property", p => items.push({ system: "amplitude", container: "Tracking plan", kind: "event property", name: p.event_property, label: "", parent: p.event_type || "All events", description: `Type ${p.type || "?"}. ${p.description || ""} Synced from Amplitude.`.trim() }));
-      await part("User properties", "/api/2/taxonomy/user-property", p => items.push({ system: "amplitude", container: "Tracking plan", kind: "user property", name: p.user_property, label: "", parent: "User properties", description: `Type ${p.type || "?"}. ${p.description || ""} Synced from Amplitude.`.trim() }));
+      const proj = `Project ${String(c.apiKey).slice(0, 8)}`; // one registry part per Amplitude project, so two projects never mix
+      await part("Event types", "/api/2/taxonomy/event", e => items.push({ system: "amplitude", container: proj, kind: "event", name: e.event_type, label: e.display_name || "", parent: e.category?.name || "", description: `${e.description || ""} ${e.is_active === false ? "(inactive)" : ""} Synced from Amplitude.`.trim() }));
+      await part("Event properties", "/api/2/taxonomy/event-property", p => items.push({ system: "amplitude", container: proj, kind: "event property", name: p.event_property, label: "", parent: p.event_type || "All events", description: `Type ${p.type || "?"}. ${p.description || ""} Synced from Amplitude.`.trim() }));
+      await part("User properties", "/api/2/taxonomy/user-property", p => items.push({ system: "amplitude", container: proj, kind: "user property", name: p.user_property, label: "", parent: "User properties", description: `Type ${p.type || "?"}. ${p.description || ""} Synced from Amplitude.`.trim() }));
       return { items, report }; }
   },
   {
@@ -360,7 +361,7 @@ function routes(app, { auth, isAdmin, wrap, bad }) {
     const m = await merge(out.items, out.issues, req.user.id, def.id, out.report);
     st.lastSync = { at: new Date().toISOString(), created: m.created, updated: m.updated, logged: m.logged, failed: out.report.filter(r => !r.ok).map(r => `${r.part}: ${r.error}`) };
     await save(def.id, st, req.user.id);
-    console.log("SYNC", def.id, JSON.stringify({ created: m.created, updated: m.updated, logged: m.logged, stale: m.stale.length, report: out.report }));
+    console.log("SYNC", def.id, JSON.stringify({ created: m.created, updated: m.updated, logged: m.logged, stale: m.stale.length, report: out.report, events: out.items.filter(i => /event|conversion/.test(i.kind) && !/propert/.test(i.kind)).map(i => i.container + ": " + i.name).slice(0, 300) }));
     res.json({ ...m, report: out.report, connection: view(def, st) });
   }));
 }
