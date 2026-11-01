@@ -316,7 +316,7 @@ async function merge(items, issues, uid, connId, report) {
   const pairs = [...new Set(items.map(i => [i.system, i.container, i.kind].join("\u0000")))].map(s => s.split("\u0000"));
   let stale = [];
   for (const [system, container, kind] of pairs) {
-    const r = await q(`SELECT id,system,container,name,label FROM impls WHERE system=$1 AND container=$2 AND kind=$3 AND state<>'deprecated' AND NOT (id = ANY($4))`, [system, container, kind, [...seen]]);
+    const r = await q(`SELECT id,system,container,name,label FROM impls WHERE system=$1 AND container=$2 AND kind=$3 AND state NOT IN ('deprecated','planned') AND NOT (id = ANY($4))`, [system, container, kind, [...seen]]);
     stale = stale.concat(r.rows);
   }
   return { created, updated, logged, stale };
