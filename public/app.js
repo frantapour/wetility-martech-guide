@@ -731,7 +731,7 @@ document.addEventListener("click", async e => {
 // ---------- view: settings & connections ----------
 function connCard(v) {
   const r = S.connSync?.[v.id], open = S.connOpen === v.id || !v.configured && S.connOpen == null && v.id === "freshsales";
-  const status = !v.configured ? ["", "Not connected"] : v.lastTest?.ok === false ? ["bad", "Last test failed"] : v.lastTest?.ok ? ["ok", "Connected"] : ["warn", "Saved, not tested"];
+  const status = v.lastTest?.ok && v.configured ? ["ok", "Connected"] : v.manual ? ["ok", "Done: imported"] : !v.configured ? ["", "Not connected"] : v.lastTest?.ok === false ? ["bad", "Last test failed"] : ["warn", "Saved, not tested"];
   const field = f => f.secret
     ? `<label for="c-${v.id}-${f.key}">${esc(f.label)}${f.saved ? ` <span class="pill ok" style="margin-left:4px">saved${f.last4 ? ", ending " + esc(f.last4) : ""}</span>` : ""}${f.type === "textarea" ? `<textarea id="c-${v.id}-${f.key}" name="${f.key}" rows="4" spellcheck="false" placeholder="${f.saved ? "Leave blank to keep the saved key" : "Paste the whole .json file"}"></textarea>` : `<input id="c-${v.id}-${f.key}" name="${f.key}" type="password" autocomplete="new-password" placeholder="${f.saved ? "Leave blank to keep the saved value" : "Paste it here"}">`}${f.help ? `<span style="font-size:12px">${esc(f.help)}</span>` : ""}</label>`
     : `<label for="c-${v.id}-${f.key}">${esc(f.label)}<input id="c-${v.id}-${f.key}" name="${f.key}" value="${esc(f.value)}" placeholder="${esc(f.placeholder)}" autocomplete="off">${f.help ? `<span style="font-size:12px">${esc(f.help)}</span>` : ""}</label>`;
@@ -742,10 +742,11 @@ function connCard(v) {
    ${open ? `<form class="f" data-form="conn-save" data-id="${v.id}" autocomplete="off" style="margin-top:10px">
     ${v.fields.map(field).join("")}
     <p class="muted" style="font-size:12.5px;margin:0">Keys are stored encrypted and never shown again. Use credentials owned by a Wetility admin account, not a personal or agency one.</p>
-    <div class="acts"><button class="btn primary" type="submit">${icon("key", "sm")}Save</button>${v.fields.some(f => f.saved) ? `<button class="btn ghost" type="button" data-act="conn-remove" data-id="${v.id}">Remove keys</button>` : ""}</div>
+    <div class="acts"><button class="btn primary" type="submit">${icon("key", "sm")}Save</button>${v.fields.some(f => f.saved) ? `<button class="btn ghost" type="button" data-act="conn-remove" data-id="${v.id}">Remove keys${v.lastSync ? " (keeps the synced data)" : ""}</button>` : ""}</div>
    </form>` : ""}
    <div class="acts" style="margin-top:10px"><button class="btn" type="button" data-act="conn-test" data-id="${v.id}" ${v.configured ? "" : "disabled"}>${icon("check", "sm")}Test connection</button><button class="btn" type="button" data-act="conn-sync" data-id="${v.id}" ${v.configured ? "" : "disabled"}>${icon("upload", "sm")}Sync now</button></div>
-   ${v.configured ? "" : `<p class="muted" style="font-size:12.5px;margin:6px 0 0">To test and sync, ${open ? "fill in and save" : "open this card and save"}: <b>${esc((v.missing || []).join(", "))}</b>.</p>`}
+   ${v.manual ? `<p class="by" style="margin:6px 0 0">${icon("check", "sm")} Marked done: ${esc(v.manual.note)} (${esc(v.manual.by || "")}, ${fmtD(v.manual.at)}). <button class="btn ghost sm" data-act="conn-manual" data-id="${v.id}" data-v="0">Undo</button></p>` : `<p class="by" style="margin:6px 0 0"><button class="btn ghost sm" data-act="conn-manual" data-id="${v.id}" data-v="1">Mark as done (imported another way)</button></p>`}
+   ${v.configured || v.manual ? "" : `<p class="muted" style="font-size:12.5px;margin:6px 0 0">To test and sync, ${open ? "fill in and save" : "open this card and save"}: <b>${esc((v.missing || []).join(", "))}</b>.</p>`}
    ${v.lastTest && open ? `<div class="box ${v.lastTest.ok ? "ok" : "bad"}"><b>${v.lastTest.ok ? "Connection works" : "Connection failed"}</b>${esc(v.lastTest.message)} <span class="muted" style="font-size:12px">${fmtDT(v.lastTest.at)}</span></div>` : ""}
    ${S.connBusy === v.id ? `<div class="box info"><b>Syncing…</b>Reading configuration from ${esc(v.name)}. This can take a minute.</div>` : ""}
    ${r ? `<h3>Sync result</h3><div class="list">${r.report.map(x => `<div class="row" style="grid-template-columns:24px minmax(0,1fr) auto"><div>${icon(x.ok ? "check" : "x", "sm")}</div><div class="txt"><b>${esc(x.part)}</b>${x.note ? ` <span class="muted">${esc(x.note)}</span>` : ""}${x.ok ? "" : `<div class="by sev-high">${esc(x.error)}</div>`}</div><div class="pill ${x.ok ? "ok" : "bad"}">${x.ok ? x.count + " items" : "failed"}</div></div>`).join("")}</div>
@@ -756,7 +757,7 @@ function connCard(v) {
 function vSettings() {
   if (!isAdmin()) return `<h1>Admins only</h1><p class="muted">Ask an admin to manage connections.</p>`;
   if (!S.conns) { api("GET", "/api/connections").then(v => { S.conns = v; render(true); }).catch(e => toast(e.message)); return `<h1>Settings & connections</h1><p class="muted">Loading…</p>`; }
-  const n = S.conns.filter(c => c.configured).length;
+  const n = S.conns.filter(c => c.configured || c.manual).length;
   return `<div class="eyebrow">Admin</div><h1>Settings & connections</h1>
   <p class="lede">Connect the guide to Wetility's systems so the registry refreshes from the source instead of copy-paste. Connections read configuration only (fields, events, tags, ownership), never customer records. ${n} of ${S.conns.length} connected.</p>
   ${S.conns.map(connCard).join("")}
@@ -1224,6 +1225,7 @@ document.addEventListener("click", async e => {
       case "user-del": await api("DELETE", "/api/users/" + id); S.users = null; toast("Removed"); break;
       case "vm-edit": S.vmEdit = true; return render(true);
       case "vm-cancel": S.vmEdit = false; return render(true);
+      case "conn-manual": connSet(await api("POST", `/api/connections/${id}/manual`, { done: b.dataset.v === "1" })); toast(b.dataset.v === "1" ? "Marked done" : "Unmarked"); return render(true);
       case "conn-open": S.connOpen = S.connOpen === id ? "" : id; return render(true);
       case "conn-test": b.disabled = true; { const v = await api("POST", `/api/connections/${id}/test`); connSet(v); toast(v.lastTest?.ok ? "Connection works" : "Connection failed"); } return render(true);
       case "conn-remove": connSet(await api("DELETE", "/api/connections/" + id)); if (S.connSync) delete S.connSync[id]; toast("Keys removed"); return render(true);

@@ -304,7 +304,7 @@ function view(def, st) {
   const configured = !missing.length;
   return { id: def.id, name: def.name, systems: def.systems, intro: def.intro,
     fields: def.fields.map(f => ({ key: f.key, label: f.label, secret: !!f.secret, placeholder: f.placeholder || "", help: f.help || "", type: f.type || "", value: f.secret ? "" : (st.values?.[f.key] || f.default || ""), saved: f.secret ? !!st.secrets?.[f.key] : undefined, last4: f.secret && st.secrets?.[f.key] ? st.secrets[f.key].last4 : "" })),
-    configured, missing, lastTest: st.lastTest, lastSync: st.lastSync };
+    configured, missing, lastTest: st.lastTest, lastSync: st.lastSync, manual: st.manual || null };
 }
 
 // ---------- merge into registry ----------
@@ -366,9 +366,16 @@ function routes(app, { auth, isAdmin, wrap, bad }) {
     await q("INSERT INTO audit (by_user,entity,entity_id,action,detail) VALUES ($1,'settings',$2,'connection saved',$3)", [req.user.id, def.id, JSON.stringify({ secretsChanged: changed })]);
     res.json(view(def, st));
   }));
+  // Mark a platform as done when its setup was brought in by export or copy-paste instead of the API.
+  app.post("/api/connections/:id/manual", auth, isAdmin, wrap(async (req, res) => {
+    const def = BY_ID[req.params.id]; if (!def) return bad(res, "Unknown connection.", 404);
+    const st = await load(def.id);
+    st.manual = req.body.done ? { at: new Date().toISOString(), by: req.user.name, note: String(req.body.note || "Imported from exports").slice(0, 200) } : null;
+    await save(def.id, st, req.user.id); res.json(view(def, st));
+  }));
   app.delete("/api/connections/:id", auth, isAdmin, wrap(async (req, res) => {
     const def = BY_ID[req.params.id]; if (!def) return bad(res, "Unknown connection.", 404);
-    const st = await load(def.id); st.secrets = {}; st.lastTest = null; await save(def.id, st, req.user.id);
+    const st = await load(def.id); st.secrets = {}; st.lastTest = null; if (st.lastSync && !st.manual) st.manual = { at: new Date().toISOString(), by: req.user.name, note: `Synced ${new Date(st.lastSync.at).toLocaleDateString("en-ZA")}, keys removed afterwards` }; await save(def.id, st, req.user.id);
     await q("INSERT INTO audit (by_user,entity,entity_id,action) VALUES ($1,'settings',$2,'credentials removed')", [req.user.id, def.id]);
     res.json(view(def, st));
   }));
