@@ -824,7 +824,7 @@ function renderNav() {
 function renderMenu() {
   $("#menu").innerHTML = S.menu ? `<div class="menu" role="menu"><div class="who"><b>${esc(S.me.name)}</b><span>${esc(S.me.email)} · ${esc(S.me.role)}</span></div>
    <label class="mi" for="iam">${icon("user", "sm")}My sections<select id="iam"><option value="">Everyone</option>${PEOPLE.map(n => `<option ${n === filterMe ? "selected" : ""}>${n}</option>`).join("")}</select></label>
-   ${isAdmin() ? `<button data-act="go" data-h="admin">${icon("shield", "sm")}People and access</button>` : ""}
+   ${isAdmin() ? `<button data-act="go" data-h="settings">${icon("key", "sm")}Settings & connections</button><button data-act="go" data-h="admin">${icon("shield", "sm")}People and access</button>` : ""}
    <button data-act="pw">${icon("key", "sm")}Change password</button><button data-act="logout">${icon("logout", "sm")}Sign out</button></div>` : "";
 }
 let deferred = false;
