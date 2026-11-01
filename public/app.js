@@ -42,7 +42,7 @@ async function load() {
 }
 function analyze() {
   const F = S.data.fields, I = S.data.impls;
-  const fieldOf = id => F.find(f => f.id === id);
+  const FM = new Map(F.map(f => [f.id, f])), fieldOf = id => FM.get(id);
   const active = F.filter(f => f.status !== "deprecated");
   const byField = {}; I.forEach(i => { (byField[i.field_id || ""] ??= []).push(i); });
   const code = {};
@@ -1198,7 +1198,7 @@ document.addEventListener("click", async e => {
   if (act === "inline") { S.inline = S.inline === b.dataset.k ? null : b.dataset.k || null; render(true); setTimeout(() => document.querySelector("#view .inline input:not([type=hidden]), #view .inline textarea")?.focus(), 0); return; }
   if (act === "kbf") { S.kbF = b.dataset.f; render(true); return; }
   if (act === "set-state") { if (!canWrite()) return; const key = b.dataset.key, v = b.dataset.v; S.statusMap[key] = { ...(S.statusMap[key] || {}), state: v, by_user: S.me.id, at: new Date().toISOString() }; render(true);
-    try { await api("POST", "/api/status", { key, state: v }); toast({ done: "Marked done", pass: "Marked passed", fail: "Marked failed", blocked: "Marked blocked", progress: "In progress", approved: "Approved", todo: "Status cleared" }[v] || "Saved"); await refresh(); } catch (err) { toast(err.message); await refresh(); } return; }
+    try { await api("POST", "/api/status", { key, state: v }); toast({ done: "Marked done", pass: "Marked passed", fail: "Marked failed", blocked: "Marked blocked", progress: "In progress", approved: "Approved", todo: "Status cleared" }[v] || "Saved"); S.ver = null; } catch (err) { toast(err.message); await refresh(); } return; }
   const confirmFirst = ["del-comments", "del-logs", "del-results", "del-impl", "user-del", "merge", "reset", "conn-remove"];
   if (confirmFirst.includes(act) && !b.dataset.armed) { b.dataset.armed = "1"; const t = b.textContent; b.textContent = "Click again to confirm"; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = t; } }, 3500); return; }
   try {
@@ -1236,7 +1236,14 @@ document.addEventListener("click", async e => {
 async function start() {
   try { await load(); } catch (e) { if (e.status === 401) return loginScreen(); $("#root").innerHTML = `<div class="login"><div class="box bad"><b>Could not load the guide</b>${esc(e.message)}</div></div>`; return; }
   shell(); render();
-  clearInterval(S._poll); S._poll = setInterval(() => { if (!document.hidden) refresh().catch(err => { if (err.status === 401) loginScreen("Your session ended. Sign in again."); }); }, 30000);
+  clearInterval(S._poll); S._poll = setInterval(async () => {
+    if (document.hidden || S._polling) return; S._polling = true;
+    try { const { v, build } = await api("GET", "/api/version");
+      if (S.build && build !== S.build) { const typing = document.activeElement?.matches?.("input,textarea,select"); if (!typing) { S.build = build; toast("A new version is ready. Reloading..."); setTimeout(() => location.reload(), 1200); return; } }
+      S.build = build;
+      if (S.ver && v !== S.ver) { S.ver = v; await refresh(); } else S.ver = v;
+    } catch (err) { if (err.status === 401) loginScreen("Your session ended. Sign in again."); } finally { S._polling = false; }
+  }, 30000);
 }
 start();
 })();

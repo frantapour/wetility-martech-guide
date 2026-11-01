@@ -1,6 +1,7 @@
 const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
+const compression = require("compression");
 const session = require("express-session");
 const PgStore = require("connect-pg-simple")(session);
 const bcrypt = require("bcryptjs");
@@ -63,6 +64,7 @@ app.use((req, res, next) => {
   });
   next();
 });
+app.use(compression());
 app.use(express.json({ limit: "200kb" }));
 app.use(session({
   store: new PgStore({ pool, createTableIfMissing: true }),
@@ -148,6 +150,16 @@ app.get("/api/state", auth, wrap(async (req, res) => {
   });
 }));
 
+// Cheap change check for the 30-second poll: the browser only reloads the full state when this changes.
+app.get("/api/version", auth, wrap(async (req, res) => {
+  const r = await q(`SELECT concat_ws('|',
+    (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM statuses), (SELECT count(*)||':'||coalesce(max(at)::text,'')||':'||coalesce(max(resolved_at)::text,'') FROM issues),
+    (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM impls), (SELECT count(*)||':'||coalesce(max(updated_at)::text,'') FROM fields),
+    (SELECT count(*)||':'||coalesce(max(updated_at)::text,'') FROM kb), (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM logs),
+    (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM comments), (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM results),
+    (SELECT coalesce(max(id),0) FROM audit), (SELECT count(*) FROM users)) AS v`);
+  res.set("Cache-Control", "no-store").json({ v: r.rows[0].v, build: BUILD });
+}));
 app.post("/api/status", auth, canWrite, wrap(async (req, res) => {
   const key = str(req.body.key, 80), state = str(req.body.state, 20);
   if (!/^[a-z0-9-]+$/i.test(key) || !state) return bad(res, "Invalid status.");
@@ -500,7 +512,10 @@ app.put("/api/value-model", auth, canWrite, wrap(async (req, res) => {
 }));
 
 app.get("/healthz", (req, res) => res.json({ ok: true }));
-app.get("*", (req, res) => res.sendFile(path.join(__dirname, "..", "public", "index.html")));
+// index.html is served with a build stamp on every script and stylesheet, so a phone never mixes old and new files after a deploy.
+const BUILD = (process.env.RAILWAY_GIT_COMMIT_SHA || String(Date.now())).slice(0, 12);
+const INDEX = require("fs").readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8").replace(/(src|href)="(\/[^"]+\.(?:js|css))"/g, `$1="$2?v=${BUILD}"`);
+app.get("*", (req, res) => { res.set("Cache-Control", "no-cache"); res.type("html").send(INDEX); });
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: "Something went wrong on the server. Try again; if it repeats, log an issue." });
@@ -551,6 +566,9 @@ app.use((err, req, res, next) => {
   await seedV41();
   await seedV42();
   await seedV43();
+  q(`SELECT (SELECT count(*) FROM impls) n_impls, (SELECT count(*) FROM issues) n_issues,
+      (SELECT sum(length(row_to_json(t)::text)) FROM impls t) + (SELECT sum(length(row_to_json(t)::text)) FROM issues t) + (SELECT coalesce(sum(length(row_to_json(t)::text)),0) FROM kb t) + (SELECT coalesce(sum(length(row_to_json(t)::text)),0) FROM fields t) AS state_bytes`)
+    .then(r => console.log("STATE SIZE", JSON.stringify(r.rows[0]))).catch(() => {});
   await ensureAdmin();
   app.listen(PORT, () => console.log(`MarTech guide listening on ${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });
