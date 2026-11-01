@@ -165,7 +165,7 @@ const CONNECTORS = [
   },
   {
     id: "zuper", name: "Zuper", systems: ["zuper"],
-    intro: "Webhooks configured in Zuper (module, event, destination, status). Job statuses and custom fields still come from copy-paste: Zuper's API does not document a list endpoint for them.",
+    intro: "Webhooks (module, event, destination, status), job statuses and job categories configured in Zuper. Never reads jobs or customers.",
     fields: [
       { key: "company", optional: true, label: "Zuper company login name", placeholder: "wetility", help: "The company name you type on the Zuper sign-in page. The app looks up your region's API address from it." },
       { key: "baseUrl", label: "API base URL (optional)", optional: true, placeholder: "Found automatically", help: "Leave blank. Only fill in if Zuper support gave you an address, for example https://xx-xxxx-1x.zuperpro.com/api." },
@@ -179,13 +179,16 @@ const CONNECTORS = [
       return u.replace(/\/+$/, "") + "/api";
     },
     async _z(c, path) { if (!c.apiKey) throw fail("Save the API key first."); const base = await this._base(c); return http(base + path, { headers: { "x-api-key": c.apiKey }, label: "Zuper" }); },
-    // Zuper documents webhooks under two paths; try both and keep whichever answers.
-    async _hooks(c) { let last; for (const path of ["/webhooks", "/service/notifications/webhook", "/service/notifications/webhooks"]) { try { const j = await this._z(c, path); const list = Array.isArray(j) ? j : j.data || j.webhooks || []; console.log("ZUPER webhooks path", path, "items", list.length); return { path, list }; } catch (e) { last = e; if (e.status !== 404) throw e; } } throw last; },
-    async test(c) { const base = await this._base(c); const { path, list } = await this._hooks(c); return `Connected to ${base} (${path}). ${list.length} webhook(s) visible.`; },
+    // Zuper's paths differ between its reference and third-party docs; try each and log the one that answers.
+    async _try(c, label, paths) { let last; for (const path of paths) { try { const j = await this._z(c, path); const list = Array.isArray(j) ? j : Array.isArray(j.data) ? j.data : j.data?.data || j.webhooks || []; console.log("ZUPER", label, "path", path, "items", list.length); return { path, list }; } catch (e) { last = e; if (e.status !== 404) throw e; } } console.log("ZUPER", label, "no path answered:", paths.join(" ")); throw last; },
+    _hooks(c) { return this._try(c, "webhooks", ["/webhook", "/webhooks", "/service/notifications/webhook"]); },
+    async test(c) { const base = await this._base(c); let msg = []; for (const [l, f] of [["webhooks", () => this._hooks(c)], ["job statuses", () => this._try(c, "job statuses", ["/jobs/status", "/jobs/statuses", "/job_status", "/jobs/job_status"])]]) { try { const r = await f(); msg.push(`${r.list.length} ${l}`); } catch (e) { if (e.status !== 404) throw e; msg.push(`${l}: not found`); } }
+      return `Connected to ${base}. ${msg.join("; ")}.`; },
     async sync(c) { const items = [], report = [];
-      try { const { list } = await this._hooks(c);
-        list.forEach(w => items.push({ system: "zuper", container: "Webhooks", kind: "webhook event", name: Importer.slug(w.webhook_name || w.name || w.webhook_uid || "webhook"), label: w.webhook_name || w.name || "", parent: w.module || w.module_name || "", description: `Event ${w.event || w.webhook_event || "?"} → ${w.url || w.webhook_url || w.request_url || "?"}. ${w.is_active === false || w.status === "INACTIVE" ? "INACTIVE. " : ""}Synced from Zuper.` }));
-        report.push({ part: "Webhooks", ok: true, count: list.length }); } catch (e) { report.push({ part: "Webhooks", ok: false, error: e.message }); }
+      const run = async (part, fn, map) => { try { const { list } = await fn(); list.forEach(x => { const it = map(x); if (it && it.name) items.push({ system: "zuper", ...it }); }); report.push({ part, ok: true, count: list.length }); } catch (e) { report.push({ part, ok: false, error: e.message }); } };
+      await run("Webhooks", () => this._hooks(c), w => ({ container: "Webhooks", kind: "webhook event", name: Importer.slug(w.webhook_name || w.name || w.webhook_uid || "webhook"), label: w.webhook_name || w.name || "", parent: w.module || w.module_name || w.webhook_module || "", description: `Event ${w.event || w.webhook_event || w.trigger || "?"} → ${w.url || w.webhook_url || w.request_url || "?"}. ${w.is_active === false || w.status === "INACTIVE" || w.is_enabled === false ? "INACTIVE. " : ""}Synced from Zuper.` }));
+      await run("Job statuses", () => this._try(c, "job statuses", ["/jobs/status", "/jobs/statuses", "/job_status", "/jobs/job_status"]), x => { const n = x.status_name || x.name || x.title; return { container: "Job statuses", kind: "job status", name: Importer.slug(n || ""), label: n || "", parent: x.status_type || x.type || "", description: `Zuper job status${x.status_type ? " (" + x.status_type + ")" : ""}. Synced from Zuper.` }; });
+      await run("Job categories", () => this._try(c, "job categories", ["/jobs/category", "/jobs/categories", "/job_category", "/jobs/job_category"]), x => { const n = x.category_name || x.name || x.title; return { container: "Job categories", kind: "field", name: Importer.slug(n || ""), label: n || "", parent: "Job category", description: `Zuper job category. Synced from Zuper.` }; });
       return { items, report }; }
   },
   {
