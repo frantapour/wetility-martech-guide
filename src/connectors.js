@@ -167,11 +167,19 @@ const CONNECTORS = [
     id: "zuper", name: "Zuper", systems: ["zuper"],
     intro: "Webhooks configured in Zuper (module, event, destination, status). Job statuses and custom fields still come from copy-paste: Zuper's API does not document a list endpoint for them.",
     fields: [
-      { key: "baseUrl", label: "API base URL", placeholder: "https://us-west-1c.zuperpro.com/api", help: "Your region's address. Ask Zuper support or Josh; it ends in /api." },
+      { key: "company", optional: true, label: "Zuper company login name", placeholder: "wetility", help: "The company name you type on the Zuper sign-in page. The app looks up your region's API address from it." },
+      { key: "baseUrl", label: "API base URL (optional)", optional: true, placeholder: "Found automatically", help: "Leave blank. Only fill in if Zuper support gave you an address, for example https://xx-xxxx-1x.zuperpro.com/api." },
       { key: "apiKey", label: "API key", secret: true, help: "Zuper: Settings → Developer Hub → API keys. Use a key from a Wetility admin account." }
     ],
-    _z(c, path) { if (!c.baseUrl || !c.apiKey) throw fail("Save the base URL and API key first."); return http(`${String(c.baseUrl).replace(/\/+$/, "")}${path}`, { headers: { "x-api-key": c.apiKey }, label: "Zuper" }); },
-    async test(c) { const j = await this._z(c, "/service/notifications/webhook"); return `Connected. ${(j.data || []).length} webhook(s) visible.`; },
+    async _base(c) {
+      if (c.baseUrl) { const b = String(c.baseUrl).trim().replace(/\/+$/, ""); return /\/api$/.test(b) ? b : b + "/api"; }
+      if (!c.company) throw fail("Save the Zuper company login name first.");
+      const j = await http("https://accounts.zuperpro.com/api/config", { method: "POST", body: { company_name: String(c.company).trim() }, label: "Zuper account lookup" });
+      const u = j?.config?.dc_api_url; if (!u) throw fail(`Zuper did not recognise the company login name "${c.company}". Use exactly what you type on the Zuper sign-in page.`);
+      return u.replace(/\/+$/, "") + "/api";
+    },
+    async _z(c, path) { if (!c.apiKey) throw fail("Save the API key first."); const base = await this._base(c); return http(base + path, { headers: { "x-api-key": c.apiKey }, label: "Zuper" }); },
+    async test(c) { const base = await this._base(c); const j = await this._z(c, "/service/notifications/webhook"); return `Connected to ${base}. ${(j.data || []).length} webhook(s) visible.`; },
     async sync(c) { const items = [], report = [];
       try { const j = await this._z(c, "/service/notifications/webhook"); const list = j.data || [];
         list.forEach(w => items.push({ system: "zuper", container: "Webhooks", kind: "webhook event", name: Importer.slug(w.webhook_name || w.name || w.webhook_uid || "webhook"), label: w.webhook_name || w.name || "", parent: w.module || w.module_name || "", description: `Event ${w.event || w.webhook_event || "?"} → ${w.url || w.webhook_url || w.request_url || "?"}. ${w.is_active === false || w.status === "INACTIVE" ? "INACTIVE. " : ""}Synced from Zuper.` }));
