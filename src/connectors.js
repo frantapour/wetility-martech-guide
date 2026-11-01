@@ -360,6 +360,7 @@ function routes(app, { auth, isAdmin, wrap, bad }) {
     const m = await merge(out.items, out.issues, req.user.id, def.id, out.report);
     st.lastSync = { at: new Date().toISOString(), created: m.created, updated: m.updated, logged: m.logged, failed: out.report.filter(r => !r.ok).map(r => `${r.part}: ${r.error}`) };
     await save(def.id, st, req.user.id);
+    console.log("SYNC", def.id, JSON.stringify({ created: m.created, updated: m.updated, logged: m.logged, stale: m.stale.length, report: out.report }));
     res.json({ ...m, report: out.report, connection: view(def, st) });
   }));
 }
