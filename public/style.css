@@ -552,3 +552,4 @@ ol.seq{padding-left:20px}ol.seq li{margin:8px 0}
 .gap>summary{position:relative;padding-right:34px}
 .gap>summary::after{content:"";position:absolute;right:14px;top:18px;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
 .gap[open]>summary::after{transform:rotate(-135deg);top:22px}
+.box li b,.box p b{display:inline;margin:0}
