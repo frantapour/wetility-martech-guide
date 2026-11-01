@@ -46,6 +46,7 @@ const { seedV39 } = require("./seed_v39");
 const { seedV40 } = require("./seed_v40");
 const { seedV41 } = require("./seed_v41");
 const { seedV42 } = require("./seed_v42");
+const { seedV43 } = require("./seed_v43");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -455,6 +456,17 @@ app.get("/api/export/:what.csv", auth, wrap(async (req, res) => {
   res.send("﻿" + csv(rows));
 }));
 
+// Executive summary: JSON for the Home card, Word and Excel downloads.
+const summary = require("./summary");
+app.get("/api/summary", auth, wrap(async (req, res) => res.json(await summary.build())));
+app.get("/api/summary.:fmt(docx|xlsx)", auth, wrap(async (req, res) => {
+  const s = await summary.build(), fmt = req.params.fmt;
+  const buf = fmt === "docx" ? await summary.toDocx(s) : await summary.toXlsx(s);
+  const type = fmt === "docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  res.set({ "Content-Type": type, "Content-Disposition": `attachment; filename="wetility-martech-executive-summary-${new Date().toISOString().slice(0, 10)}.${fmt}"`, "Cache-Control": "no-store" });
+  res.send(Buffer.from(buf));
+}));
+
 require("./connectors").routes(app, { auth, isAdmin, wrap, bad });
 // Conversion value model: products x funnel stages, owned in one place (configuration, no customer data).
 const VM_DEFAULT = {
@@ -538,6 +550,7 @@ app.use((err, req, res, next) => {
   await seedV40();
   await seedV41();
   await seedV42();
+  await seedV43();
   await ensureAdmin();
   app.listen(PORT, () => console.log(`MarTech guide listening on ${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });

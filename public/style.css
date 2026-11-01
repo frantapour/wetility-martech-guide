@@ -556,3 +556,16 @@ ol.seq{padding-left:20px}ol.seq li{margin:8px 0}
 .gap.act>summary{grid-template-columns:auto minmax(0,1fr) auto}
 .gap.act .actmeta{grid-column:2/-1;font-size:13px;color:var(--muted);font-weight:400}
 @media (max-width:900px){.gap.act .actmeta{font-size:14px!important;grid-column:2}}
+/* Executive summary card (Home) */
+.exec{margin:0 0 18px;padding:16px 18px;border-color:var(--sun-line)}
+.exec-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.exec-top .acts{display:flex;gap:8px;flex-wrap:wrap}
+.exec-head{font-size:16px;line-height:1.5;margin:12px 0;font-weight:600}
+.exec-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:4px 0 8px}
+.exec-stats a{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit;background:var(--sunk)}
+.exec-stats a b{font:700 22px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.exec-stats a span{font-size:13px;color:var(--muted)}
+.exec-stats a.late b{color:var(--bad,#C0392B)}
+.exec-more summary{cursor:pointer;font-weight:600;padding:8px 0;min-height:44px;display:flex;align-items:center}
+.exec-msgs{padding-left:18px;margin:4px 0 12px}.exec-msgs li{margin:0 0 8px;line-height:1.5}
+@media (max-width:640px){.exec-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.exec-top .acts{width:100%}.exec-top .acts .btn{flex:1;text-align:center;justify-content:center}}
