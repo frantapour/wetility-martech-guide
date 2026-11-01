@@ -78,6 +78,23 @@ async function build() {
     return { id, due, title, owner, how, gaps, status: STATE_LABEL[s] || s, overdue: s !== "done" && due < today };
   });
   const gaps = GAPS.map(g => ({ id: g[0], title: g[1], owner: g[3], effort: g[4], when: g[6], kind: g[7], status: STATE_LABEL[st("gap-" + g[0])] || st("gap-" + g[0]) }));
+  // Latest Clarity pull (Settings → Microsoft Clarity → Sync), if any: adds live website rows to the key data.
+  const metrics = [...METRICS];
+  try {
+    const r = await q("SELECT value FROM settings WHERE key='clarity:latest'");
+    if (r.rowCount) {
+      const cl = JSON.parse(r.rows[0].value), T = cl.totals || {}, asof = new Date(cl.at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }), src = `Clarity API, last ${cl.days} days`;
+      const find = re => Object.entries(T).find(([k]) => re.test(k))?.[1] || {};
+      const pick = (o, ...keys) => { for (const k of keys) if (o[k] !== undefined && o[k] !== null && o[k] !== "") return o[k]; return null; };
+      const pct = v => v === null ? null : `${Number(v).toFixed(1)}%`;
+      const tr = find(/traffic/i);
+      [["Sessions", pick(tr, "totalSessionCount")], ["Users", pick(tr, "distinctUserCount", "distantUserCount")],
+       ["Sessions with dead clicks", pct(pick(find(/dead/i), "sessionsWithMetricPercentage"))], ["Sessions with rage clicks", pct(pick(find(/rage/i), "sessionsWithMetricPercentage"))],
+       ["Sessions with JavaScript errors", pct(pick(find(/scripterror/i), "sessionsWithMetricPercentage"))], ["Average scroll depth", pct(pick(find(/scroll ?depth/i), "averageScrollDepth"))]]
+        .forEach(([k, v]) => { if (v !== null) metrics.push([`${k} (live)`, isNaN(v) ? v : Number(v), src, asof]); });
+      (cl.bySource || []).slice(0, 5).forEach(x => metrics.push([`Sessions from ${x.source} (live)`, x.sessions, src, asof]));
+    }
+  } catch (e) { /* summary still renders without live data */ }
   const counts = {
     issuesOpen: open.length,
     issuesHigh: open.filter(i => i.severity === "high").length,
@@ -87,7 +104,7 @@ async function build() {
     gapsDone: gaps.filter(g => g.status === "Done").length,
     gapsTotal: gaps.length
   };
-  return { asOf: AS_OF, generated: new Date().toISOString(), headline: HEADLINE, messages: MESSAGES, metrics: METRICS, ownership: OWNERSHIP, counts, actions, gaps,
+  return { asOf: AS_OF, generated: new Date().toISOString(), headline: HEADLINE, messages: MESSAGES, metrics, ownership: OWNERSHIP, counts, actions, gaps,
     highIssues: open.filter(i => i.severity === "high").map(i => ({ title: i.title, detail: i.detail })),
     openIssues: open.map(i => ({ id: i.id, severity: i.severity, title: i.title, detail: i.detail, logged: i.at })) };
 }

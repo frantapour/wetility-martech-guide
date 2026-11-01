@@ -267,6 +267,27 @@ const CONNECTORS = [
       return { items, report }; }
   },
   {
+    id: "clarity", name: "Microsoft Clarity (website behaviour)", systems: ["clarity"],
+    intro: "Pulls Clarity's live insights for the last 1 to 3 days: sessions, users, dead and rage clicks, JavaScript errors, scroll depth, plus sessions by traffic source and device. Aggregates only, no recordings. Clarity allows 10 requests a day; a test uses 1 and a sync uses 3. The latest pull feeds the executive summary.",
+    fields: [
+      { key: "token", label: "Data Export API token", secret: true, help: "Clarity (project admin): Settings → Data export → Generate new API token. Paste it here only, never in chat or email." },
+      { key: "days", optional: true, label: "Days to pull (1 to 3)", placeholder: "3", default: "3" }
+    ],
+    _c(c, dims = "") { if (!c.token) throw fail("Save the API token first."); const n = Math.min(3, Math.max(1, parseInt(c.days, 10) || 3)); return http(`https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=${n}${dims}`, { headers: { Authorization: `Bearer ${c.token}` }, label: "Clarity" }); },
+    async test(c) { const j = await this._c(c); const t = (Array.isArray(j) ? j : []).find(m => /traffic/i.test(m.metricName)); const v = t?.information?.[0]; return `Connected. ${v ? `${Number(v.totalSessionCount || 0).toLocaleString("en-ZA")} sessions in the last ${Math.min(3, Math.max(1, parseInt(c.days, 10) || 3))} days.` : "Insights are readable."} (Used 1 of 10 daily requests.)`; },
+    async sync(c) {
+      const report = [], out = { at: new Date().toISOString(), days: Math.min(3, Math.max(1, parseInt(c.days, 10) || 3)) };
+      const num = v => (v === undefined || v === null || v === "" ? null : Number(v));
+      const pull = async (label, dims, fn) => { try { const j = await this._c(c, dims); fn(Array.isArray(j) ? j : []); report.push({ part: label, ok: true, count: Array.isArray(j) ? j.length : 0 }); } catch (e) { report.push({ part: label, ok: false, error: e.message }); } };
+      await pull("Totals", "", arr => { out.totals = {}; arr.forEach(m => { const i = m.information?.[0] || {}; out.totals[m.metricName] = i; }); });
+      await pull("By traffic source", "&dimension1=Source", arr => { const t = arr.find(m => /traffic/i.test(m.metricName)); out.bySource = (t?.information || []).map(i => ({ source: i.Source || i.source || "(none)", sessions: num(i.totalSessionCount) })).sort((a, b) => (b.sessions || 0) - (a.sessions || 0)).slice(0, 12); });
+      await pull("By device", "&dimension1=Device", arr => { const t = arr.find(m => /traffic/i.test(m.metricName)); out.byDevice = (t?.information || []).map(i => ({ device: i.Device || i.device || "(none)", sessions: num(i.totalSessionCount) })).sort((a, b) => (b.sessions || 0) - (a.sessions || 0)); });
+      console.log("CLARITY", JSON.stringify(out));
+      if (out.totals) await q(`INSERT INTO settings (key,value,updated_at) VALUES ('clarity:latest',$1,now()) ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=now()`, [JSON.stringify(out)]);
+      return { items: [], report };
+    }
+  },
+  {
     id: "website", name: "Website crawl (wetility.energy)", systems: ["umbraco"],
     intro: "Reads the public website: robots.txt, sitemap and up to 80 pages. Lists the tracking code found in each page's HTML (outside GTM too), external script sources, titles, H1s, canonicals, share images, structured data and word counts. Never submits forms.",
     fields: [{ key: "domain", label: "Website domain", placeholder: "wetility.energy", default: "wetility.energy", help: "Just the domain. The crawl takes up to two minutes." }],
