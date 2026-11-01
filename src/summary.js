@@ -17,6 +17,8 @@ const MESSAGES = [
   ["Ownership", "Google Ads sits under iLead and Wetility has no access. Two Meta ad accounts, including the one in use, are owned by Growth Charter. DarkMatter owns the TikTok pixel and the Meta app dataset. Wetility owns its TikTok Business Center and ad account, the Meta Page, Instagram and WhatsApp numbers."],
   ["Privacy", "Bank, ID and credit data are open fields in Freshsales and respond.io. Meta measures conversions on customers' devices from 12 November unless the Information Officer decides otherwise. Third-party AI agents can currently take every action on three Meta ad accounts."],
   ["Measurement", "There is no single definition of a lead: about 20 GA4 lead events and 30 key events, three Meta lead events and three Amplitude projects. Sales outcomes (credit approved, contract signed, installed) are not sent back to the ad platforms, so they optimise for form fills, not customers."],
+  ["Funnel signals", "The ad platforms only ever hear about the form fill. None of the later stages (contacted, documents, credit approved, contract signed, installed) is sent back to Google, Meta or TikTok, so they find more people who fill in forms, not more people who become paying customers. Target: one event per funnel stage, sent from Freshsales and Zuper by server, valued at the chance of reaching install times customer value."],
+  ["Attribution", "Each platform claims its own leads and nobody reconciles them. Click IDs are not saved on every lead, WhatsApp leads arrive without their ad source, and brand search takes credit for demand that paid social and TikTok create. Target: click IDs and campaign tags on every lead in Freshsales, one attribution report from Freshsales against spend, aligned windows and a lift test per major channel."],
   ["Website and search", "18,964 website sessions in 30 days; Google sends 5,845 and TikTok 4,719. 8.6% of sessions hit unresponsive clicks, mostly in the bundle configurator. Organic search brings about 4,400 visits a month, but about 86% are people already searching for Wetility."],
   ["Plan and timing", "Thato (digital marketing specialist) starts on 7 November and owns the build. Freeze from 20 November to 5 December except risk fixes; no bidding or primary-conversion changes before 19 January. New signals run in parallel and report only, then switch one platform at a time with rollback triggers."]
 ];
@@ -41,6 +43,27 @@ const METRICS = [
   ["GA4 lead events", "about 20", "GA4 sync", "1 Nov 2026"],
   ["Meta lead events", 3, "Meta Events Manager", "1 Nov 2026"],
   ["Amplitude projects", 3, "Amplitude sync", "1 Nov 2026"]
+];
+
+// Funnel signals: [stage, recorded in, sent to ad platforms today, target, value used for bidding]
+const SIGNALS = [
+  ["1. Lead submitted", "Website, app, WhatsApp; Freshsales", "Yes, but split: about 20 GA4 lead events, about 14 Google Ads lead conversions, 3 Meta lead events, a custom TikTok lead event; no shared event_id", "One lead_submitted event from browser and server with the same event_id; product as a parameter", "Probability of install x customer value"],
+  ["2. Contacted", "Freshsales", "No", "Server event to GA4 and Amplitude; secondary to ad platforms", "Probability of install x customer value"],
+  ["3. Documents submitted", "Freshsales", "No", "Server event; secondary conversion on Google, Meta and TikTok", "Probability of install x customer value"],
+  ["4. Credit approved", "Freshsales", "No", "Analytics only until the Information Officer approves sending credit-derived signals", "Not sent to ad platforms"],
+  ["5. Contract signed", "SignNow, Freshsales", "No", "Server postback: Google offline conversion import, Meta Conversions API, TikTok Events API; secondary first, primary after the switch", "Expected customer value"],
+  ["6. Installed", "Zuper", "No", "Server postback to all three; the true outcome for reporting and value bidding", "Actual customer value"]
+];
+// Attribution: [channel, today, target]
+const ATTRIBUTION = [
+  ["Website leads", "Not confirmed that gclid, fbclid and ttclid are saved on the Freshsales lead; UTM capture not checked end to end", "Click IDs and UTM tags kept for 90 days and written to Freshsales on every lead (G25)"],
+  ["WhatsApp (respond.io)", "ctwa_clid and gclid not captured; WhatsApp leads show no ad source", "Save ctwa_clid and ad referral; reference code in every website WhatsApp link (G25)"],
+  ["Google Ads", "No Wetility access; about 14 lead conversions; enhanced conversions on different triggers; no offline conversion import", "Wetility admin access (A6); one lead conversion; contract and install imported from Freshsales (G13, G18)"],
+  ["Meta", "Conversions API Gateway mirrors browser events; CRM integration for qualified leads started and not finished; custom lead event without event_id", "Standard Lead with event_id; contract and install through the Conversions API (G14, G18)"],
+  ["TikTok", "Second-largest website traffic source; pixel owned by DarkMatter; CRM event sets empty", "Wetility-owned pixel in parallel (G23); contract and install through the Events API (G18)"],
+  ["App", "Branch attribution; Meta app dataset owned by DarkMatter", "Branch attribution passed onto the lead; Wetility-owned app dataset (G24, G25)"],
+  ["Reporting", "Each platform reports its own conversions; totals overlap; brand search gets credit for paid social demand", "One Freshsales report of leads to installs by source against spend; platform numbers alongside, never summed (G26)"],
+  ["Windows and lift", "Attribution windows not aligned or written down; no lift tests", "Aligned windows; one holdout or regional test each for Meta and TikTok in Q1 (G27)"]
 ];
 
 // [platform, asset, owner, Wetility access, risk]
@@ -104,7 +127,7 @@ async function build() {
     gapsDone: gaps.filter(g => g.status === "Done").length,
     gapsTotal: gaps.length
   };
-  return { asOf: AS_OF, generated: new Date().toISOString(), headline: HEADLINE, messages: MESSAGES, metrics, ownership: OWNERSHIP, counts, actions, gaps,
+  return { asOf: AS_OF, generated: new Date().toISOString(), headline: HEADLINE, messages: MESSAGES, signals: SIGNALS, attribution: ATTRIBUTION, metrics, ownership: OWNERSHIP, counts, actions, gaps,
     highIssues: open.filter(i => i.severity === "high").map(i => ({ title: i.title, detail: i.detail })),
     openIssues: open.map(i => ({ id: i.id, severity: i.severity, title: i.title, detail: i.detail, logged: i.at })) };
 }
@@ -136,6 +159,11 @@ async function toDocx(s) {
       p(`Status: ${c.actionsDone} of ${c.actionsTotal} actions done${c.actionsOverdue ? `, ${c.actionsOverdue} overdue` : ""}; ${c.gapsDone} of ${c.gapsTotal} gaps closed; ${c.issuesOpen} open problems, ${c.issuesHigh} of them high.`),
       h("Key messages"),
       ...s.messages.map(([k, v]) => new Paragraph({ bullet: { level: 0 }, spacing: { after: 100 }, children: [new TextRun({ text: k + ": ", bold: true, size: 21 }), new TextRun({ text: v, size: 21 })] })),
+      h("Funnel signals: what the ad platforms learn from"),
+      p("Today Google, Meta and TikTok only hear about the form fill. The target sends every stage back by server, so the platforms optimise for customers, not form fills."),
+      table(["Funnel stage", "Recorded in", "Sent to ad platforms today", "Target", "Value"], s.signals, [15, 15, 26, 28, 16]),
+      h("Attribution: today and target"),
+      table(["Channel", "Today", "Target"], s.attribution, [16, 42, 42]),
       h("Key data points"),
       table(["Metric", "Value", "Source", "As of"], s.metrics.map(m => [m[0], fmtNum(m[1]), m[2], m[3]]), [46, 14, 24, 16]),
       h("Who owns what"),
@@ -180,6 +208,8 @@ async function toXlsx(s) {
   sum.eachRow(row => { row.alignment = { vertical: "top", wrapText: true }; row.getCell(1).font = { bold: true }; });
   sheet("Key data", [["Metric", "metric", 42], ["Value", "value", 14], ["Source", "source", 30], ["As of", "asof", 14]], s.metrics.map(m => ({ metric: m[0], value: m[1], source: m[2], asof: m[3] })))
     .getColumn("value").numFmt = "#,##0";
+  sheet("Funnel signals", [["Funnel stage", "a", 22], ["Recorded in", "b", 26], ["Sent to ad platforms today", "c", 60], ["Target", "d", 60], ["Value", "e", 30]], s.signals.map(r => ({ a: r[0], b: r[1], c: r[2], d: r[3], e: r[4] })));
+  sheet("Attribution", [["Channel", "a", 22], ["Today", "b", 70], ["Target", "c", 70]], s.attribution.map(r => ({ a: r[0], b: r[1], c: r[2] })));
   sheet("Ownership", [["Platform", "p", 18], ["Asset", "a", 50], ["Owner", "o", 34], ["Wetility access", "w", 30], ["Risk", "r", 36]], s.ownership.map(o => ({ p: o[0], a: o[1], o: o[2], w: o[3], r: o[4] })));
   sheet("Actions", [["ID", "id", 6], ["Due", "due", 12], ["Action", "title", 56], ["Owner", "owner", 34], ["Status", "status", 13], ["Overdue", "overdue", 9], ["Closes gaps", "gaps", 12], ["How", "how", 90]],
     s.actions.map(a => ({ ...a, due: new Date(a.due + "T12:00:00"), overdue: a.overdue ? "Yes" : "" }))).getColumn("due").numFmt = "d mmm yyyy";

@@ -201,8 +201,14 @@ function execBlock() {
    <div class="acts"><a class="btn primary sm" href="/api/summary.docx" download>Download Word</a><a class="btn sm" href="/api/summary.xlsx" download>Download Excel</a></div></div>
    ${sm ? `<p class="exec-head">${esc(sm.headline)}</p>` : `<p class="muted">${sm === false ? "Could not load the summary." : "Loading the summary..."}</p>`}
    <div class="exec-stats"><a href="#arch"><b>${aDone}/${ACTIONS.length}</b><span>Actions done</span></a><a href="#arch"${aLate ? ' class="late"' : ""}><b>${aLate}</b><span>Actions overdue</span></a><a href="#arch"><b>${gDone}/${GAPS.length}</b><span>Gaps closed</span></a><a href="#issues"><b>${high}</b><span>High problems open</span></a></div>
-   ${sm ? `<details class="exec-more" data-open-key="exec" ${S.secOpen?.exec ? "open" : ""}><summary>Key messages and data points</summary>
+   ${sm ? `<details class="exec-more" data-open-key="exec" ${S.secOpen?.exec ? "open" : ""}><summary>Key messages, funnel signals, attribution and data points</summary>
     <ul class="exec-msgs">${sm.messages.map(([k, v]) => `<li><b>${esc(k)}:</b> ${esc(v)}</li>`).join("")}</ul>
+    <h3 style="margin:14px 0 6px">Funnel signals: what the ad platforms learn from</h3>
+    <p class="muted" style="margin:0 0 8px">Today they only hear about the form fill. The target sends every stage back by server.</p>
+    <div class="tbl"><table><tr><th>Stage</th><th>Sent today</th><th>Target</th><th>Value</th></tr>${sm.signals.map(r => `<tr><td><b>${esc(r[0])}</b><br><span class="muted">${esc(r[1])}</span></td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td></tr>`).join("")}</table></div>
+    <h3 style="margin:14px 0 6px">Attribution: today and target</h3>
+    <div class="tbl"><table><tr><th>Channel</th><th>Today</th><th>Target</th></tr>${sm.attribution.map(r => `<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join("")}</table></div>
+    <h3 style="margin:14px 0 6px">Key data points</h3>
     <div class="tbl"><table><tr><th>Metric</th><th>Value</th><th>Source</th></tr>${sm.metrics.map(m => `<tr><td>${esc(m[0])}</td><td><b>${esc(typeof m[1] === "number" ? m[1].toLocaleString("en-ZA") : m[1])}</b></td><td class="muted">${esc(m[2])}, ${esc(m[3])}</td></tr>`).join("")}</table></div>
     <p class="muted" style="font-size:12px;margin:8px 0 0">Findings as of ${esc(sm.asOf)}. The downloads add ownership by platform, all actions with owners, gaps and open problems.</p></details>` : ""}
   </section>`;
