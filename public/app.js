@@ -874,7 +874,8 @@ const ACTIONS = [
 function actionsBlock(limit) {
   const today = new Date().toISOString().slice(0, 10), label = Object.fromEntries(STEP_OPTS);
   const open = ACTIONS.filter(a => st("act-" + a[0]) !== "done"), done = ACTIONS.length - open.length;
-  const list = limit ? open.slice(0, limit) : ACTIONS;
+  const byDue = (a, b) => a[1].localeCompare(b[1]);
+  const list = limit ? [...open].sort(byDue).slice(0, limit) : [...ACTIONS].sort(byDue);
   const fmt = d => new Date(d + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" });
   return `<div class="gaps">${list.map(([id, due, t, who, how, gaps]) => { const v = st("act-" + id), late = v !== "done" && due < today;
     return `<details class="card gap act${v === "done" ? " done" : ""}" data-open-key="act-${id}" ${S.secOpen?.["act-" + id] ? "open" : ""}><summary><span class="gid">${id}</span><b>${esc(t)}</b><span class="pill gst st-${v}">${label[v] || v}</span><span class="actmeta"><span class="${late ? "sev-high" : ""}">${late ? "Overdue: " : "Due "}${fmt(due)}</span> · ${esc(who)}</span></summary>
