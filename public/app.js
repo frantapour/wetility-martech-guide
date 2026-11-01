@@ -819,7 +819,7 @@ function gapsBlock() {
    <p class="by">${esc(why)}</p><p class="by"><b>Owner:</b> ${esc(who)} · <b>Effort:</b> ${esc(eff)}</p><div>${sel("gap-" + id, STEP_OPTS)}</div></div></details>`; }).join("")}</div>`).join("")}`;
 }
 const ACCESS = [
-  ["meta", "Meta Business portfolio", "Business settings: People, Partners, System users; then each ad account, pixel 331051689290488 and Page", "Agencies as Partners only, not personal invites; at least 2 Wetility admins with two-factor; system-user tokens owned by Wetility"],
+  ["meta", "Meta Business portfolio", "Business settings: People, Partners, System users; then each ad account, pixel 331051689290488 and Page", "Versofy (portfolio 2378015762218064) is a Wetility brand: keep it as a group partner, not an agency. Agencies as Partners only, not personal invites; at least 2 Wetility admins with two-factor; system-user tokens owned by Wetility"],
   ["tiktok", "TikTok Business Center", "Members, Partners; pixel D0ESSGJC77U75NH4NU60 and ad accounts", "Agency as Partner with the least role; Wetility owns the Business Center"],
   ["gads", "Google Ads (AW-11401670719)", "Admin → Access and security: users, and manager accounts linked to the account", "Remove unknown manager-account links; agency access through their manager account with Standard, not Admin"],
   ["ga4", "GA4 and Firebase", "GA4 Admin → Account and Property access management; Firebase project → Users and permissions", "Viewer for most; Editor only for Thato; check linked products (Google Ads, BigQuery)"],
