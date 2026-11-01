@@ -206,6 +206,7 @@ function vOverview() {
   <div class="stats"><a href="#playbooks"><b>${Math.round(all.d / all.n * 100)}%</b><span>Steps done ›</span></a><a href="#gates"><b>${gatesOk}/7</b><span>Gates approved ›</span></a><a href="#issues"><b>${openIssues}</b><span>Open problems ›</span></a><a href="#consistency"><b>${S.A.score == null ? "–" : S.A.score + "%"}</b><span>Names consistent ›</span></a></div>
   <div class="focus"><label for="iam2" style="font-size:13px;color:#B9C6DA">Focus on</label><select id="iam2" data-focus="1"><option value="">Everyone</option>${PEOPLE.map(n => `<option ${n === filterMe ? "selected" : ""}>${n}</option>`).join("")}</select></div></section>
   <div class="cols"><div>
+   <a class="tile link starthere" href="#arch">${icon("target")}<div class="l"><b>Start here: target architecture</b><br>${GAPS.filter(g => st("gap-" + g[0]) === "done").length} of ${GAPS.length} gaps closed. What to fix, in what order, and why</div>${icon("chev", "sm go")}</a>
    <h2>${icon("target")} Next steps</h2>
    <div class="next">${ns.length ? ns.map(({ p, i, v, pr }) => `<div class="card nextcard">${ring(pr.d / pr.n * 100, 46)}<a class="t" href="#${p.id}" style="color:inherit;text-decoration:none"><b>${p.no} ${esc(p.title)}</b><div class="s">Step ${i + 1}: ${esc(p.steps[i])}</div>${v !== "todo" ? `<span class="pill ${v === "blocked" ? "bad" : "sun"}" style="margin-top:6px">${v === "blocked" ? "Blocked" : "In progress"}</span>` : ""}</a>
      <div class="acts" style="flex-direction:column;align-items:stretch">${canWrite() ? (v === "todo" ? `<button class="btn sm" data-act="set-state" data-key="${p.id}-s${i + 1}" data-v="progress">${icon("play", "sm")}Start</button>` : `<button class="btn sm primary" data-act="set-state" data-key="${p.id}-s${i + 1}" data-v="done">${icon("check", "sm")}Done</button>`) : ""}<a class="btn sm ghost" href="#${p.id}">Open</a></div></div>`).join("") : `<div class="empty">${icon("check")}Nothing left to do${filterMe ? " in " + esc(filterMe) + "'s playbooks" : ""}.</div>`}</div>
@@ -763,12 +764,186 @@ function vSettings() {
 }
 const connSet = v => { S.conns = S.conns.map(c => c.id === v.id ? v : c); };
 
+// ---------- view: target architecture (start here) ----------
+const ARCH_THEMES = [
+  ["exposure", "1. Stop the exposure", "This week", "POPIA risk comes before any optimisation.", /bank|consent|id number|id copies|session|recorder|credit score is stored|credit-derived|contact score|sensitive|attachments|privacy|replay|respondio_id/i,
+    ["Restrict the bank-detail, ID and credit fields in Freshsales to the roles that need them (Josh, Information Officer).", "Make the Meta tag respect consent instead of 'Consent Granted = True' (agency).", "Keep one session recorder and mask the form fields where people type ID numbers and contact details.", "Information Officer decides whether credit-derived signals (620+, credit approved) may go to ad platforms."],
+    "No sensitive field is open to everyone, every tag waits for consent, and the credit-signal decision is written down (gate G1)."],
+  ["definition", "2. One lead definition", "Build Nov to Dec, switch from 20 Jan", "Where the money is: Google and Meta bid better on one clean signal.", /lead|key event|conversion|event name|meta receives|enhanced|amplitude project|more than one amplitude|page view|gtm's internal|naming|three different styles|contract sent/i,
+    ["Agree the event spine below and the event_id rule (playbook 4.5).", "Website: one lead_submitted event with product as a parameter, fired after the backend accepts the form.", "GA4: generate_lead plus a handful of real key events; everything else stays a normal event.", "Google Ads: one lead conversion. Meta and TikTok: the standard Lead event with event_id.", "Amplitude: one project (89b022e4); retire the others after 30 days without data."],
+    "A lead is counted once, with the same ID, in every platform, and the GA4 key events match the spine."],
+  ["ownership", "3. Ownership and clean-up", "Alongside", "Wetility owns every account; agencies are partners, not owners.", /own|project|pipeline|clean-up|hidden fields|paused|legacy|duplicate|same facts|shared one|subscription types|web forms|tracking script|product catalogue|probabilit/i,
+    ["Confirm Wetility owns the Meta pixel 331051689290488 and TikTok pixel D0ESSGJC77U75NH4NU60 (playbooks 4.2, 4.3).", "Delete the Dark Matter Amplitude project once it is empty and unused.", "Remove the 74 paused GTM tags and the live (TEST) tags after exporting the container.", "Archive the Legacy Wetility Pipeline; set stage probabilities from real conversion rates."],
+    "Every pixel, ad account and analytics project sits in a Wetility-owned account, and nothing unused is left running."]
+];
+const SPECIALIST = "Digital marketing specialist (from 7 Nov)";
+// Gaps between today and the target, in the order that reaches the best solution fastest:
+// risk first (cheap, no dependencies), then the decisions that block building, then the build, then optimisation. Clean-up runs alongside.
+const GAPS = [
+  ["G1", "Bank details, ID number and credit score are open fields in Freshsales", "POPIA exposure today; every export and integration can read them. Check first which reports and integrations (Power BI, agencies) use the fields, so restricting them breaks nothing.", "Josh, with the Information Officer", "1 hour", "", "Now: risk fixes (do not touch bidding)", "risk"],
+  ["G2", "Meta tag sends 'Consent Granted = True' whatever the visitor chose", "Tracking without consent. Fixing it is required, but Meta will report fewer conversions afterwards (real leads do not drop). Warn the agency so nobody 'fixes' campaigns in reaction.", "Kopano (Dark Matter), then " + SPECIALIST, "30 minutes", "", "Now: risk fixes (do not touch bidding)", "risk"],
+  ["G3", "Credit-signal decision not made", "The 620+ / credit-approved signal may already reach ad platforms. If the Information Officer stops it, switch it off as a secondary change first and watch lead volume for a week.", "Information Officer (Franta raises)", "1 meeting", "", "Now: risk fixes (do not touch bidding)", "risk"],
+  ["G4", "Pixel and account ownership not verified", "If an agency owns the Meta or TikTok pixel, history and learning can be lost when the relationship ends. Transfer or share, never recreate during a campaign.", "Franta or Reeza", "30 minutes", "", "Now: risk fixes (do not touch bidding)", "risk"],
+  ["G5", "Three session recorders; form fields may not be masked", "ID numbers and contact details could be recorded. Recorders do not affect bidding, so this is safe to change at any time.", SPECIALIST, "2 hours", "", "Week of 7 Nov: decisions and safe fixes", "risk"],
+  ["G6", "Event spine and event_id rule not signed off", "Nothing can be rebuilt consistently until the six events and their parameters are agreed. Product goes in a parameter, so the 1 November range change and future ranges never need new events.", "Franta signs off; " + SPECIALIST + " drafts", "1 day", "", "Week of 7 Nov: decisions and safe fixes", "decision"],
+  ["G7", "Join key: phone number or contract_id", "Server events and postbacks need one reliable key between Freshsales, Zuper and Amplitude.", "Josh, Beryl, Timothy", "1 meeting", "", "Week of 7 Nov: decisions and safe fixes", "decision"],
+  ["G8", "Baseline and rollback triggers not set", "Before any tracking change: record 4 weeks of daily leads by source from Freshsales (the source of truth), cost per lead per platform, and platform-reported conversions, so any drop is visible within a day.", SPECIALIST, "Half a day", "", "Week of 7 Nov: decisions and safe fixes", "decision"],
+  ["G9", "Value inputs missing", "Values need installed-customer contribution per product (finance) and conversion rate per step (Freshsales report).", "Finance and sales operations; " + SPECIALIST + " collates", "1 week", "", "Week of 7 Nov: decisions and safe fixes", "decision"],
+  ["G10", "A lead is 20 different events on the website", "Add the single lead_submitted event (product as a parameter, with event_id) alongside the existing events. Remove nothing yet.", SPECIALIST + " with the web developer", "1 to 2 weeks", "G6", "Nov to Dec: build alongside, remove nothing", "build"],
+  ["G11", "Values built into GA4 event names", "Add the parameter-based versions alongside; retire the old names after the switch.", SPECIALIST + " with the web developer", "With G10", "G6", "Nov to Dec: build alongside, remove nothing", "build"],
+  ["G12", "Google Ads: about 14 lead conversions; enhanced conversions on different triggers", "Add one new lead conversion as a secondary conversion (reported, not bid on). First check whether Google Ads imports any GA4 key events, because changing those would change bidding.", SPECIALIST, "1 day", "G10", "Nov to Dec: build alongside, remove nothing", "build"],
+  ["G13", "Meta and TikTok receive a custom lead event without event_id", "Add the standard Lead event with event_id alongside the current tag. Live ad sets keep optimising on what they use today.", SPECIALIST, "1 day", "G2, G10", "Nov to Dec: build alongside, remove nothing", "build"],
+  ["G14", "About 30 GA4 key events", "Mark generate_lead as a key event now; un-mark the others only after the switch, and only once you know Google Ads does not import them.", SPECIALIST, "1 hour", "G10", "Nov to Dec: build alongside, remove nothing", "build"],
+  ["G15", "Three Amplitude projects; GTM housekeeping events sent to Amplitude", "Amplitude does not drive bidding, so consolidating into project 89b022e4 is low risk; keep the old projects read-only for 30 days.", SPECIALIST, "1 day, then a 30-day wait", "G6", "Nov to Dec: build alongside, remove nothing", "build"],
+  ["G16", "No server events from Freshsales and Zuper", "Contract and install cannot reach Amplitude or the ad platforms reliably.", "Josh with the developer", "3 to 4 weeks", "G6, G7", "Nov to Dec: build alongside, remove nothing", "build"],
+  ["G17", "No postbacks to Google, Meta and TikTok", "Send contract and install back as secondary conversions first, so they are reported and checked against Freshsales before any bidding uses them.", SPECIALIST + " with the developer", "2 weeks", "G3, G13, G16", "December: send new signals as secondary", "optimise"],
+  ["G18", "No values on conversions", "Add values to the new events only, as secondary data, and compare them with real contracts before bidding on value.", SPECIALIST, "2 days", "G9, G10", "December: send new signals as secondary", "optimise"],
+  ["G19", "Bidding still runs on the old, split signals", "After Black Friday (offer ends 19 Jan): switch one platform at a time to the new lead conversion, Google first, then Meta, then TikTok, at least a week apart. On Meta and TikTok, change the optimisation event on duplicated ad sets, not on live winners. Keep the old conversions as secondary for 30 days.", SPECIALIST + "; Franta approves each switch", "3 to 4 weeks", "G8, G10, G12, G13", "From 20 Jan: switch bidding, one platform at a time", "optimise"],
+  ["G20", "Old events, tags and conversions still running", "Remove the 20 old lead events, duplicate Google Ads conversions and old Meta tags only after 30 days of parity between the new signals and Freshsales.", SPECIALIST, "2 days", "G19", "From late Feb: remove the old setup", "cleanup"],
+  ["G21", "Clean-up that cannot affect leads", "Paused GTM tags, live (TEST) tags, the Legacy pipeline, unused hidden Freshsales fields and the Dark Matter Amplitude project. Paused tags fire nothing, so removing them is safe; export the GTM container first.", SPECIALIST + " and Josh", "Ongoing", "", "Alongside: safe clean-up", "cleanup"]
+];
+const GAP_KIND = { risk: ["bad", "Risk"], decision: ["warn", "Decision"], build: ["sun", "Build"], optimise: ["ok", "Optimise"], cleanup: ["", "Clean-up"] };
+function gapsBlock() {
+  const done = GAPS.filter(g => st("gap-" + g[0]) === "done").length, label = Object.fromEntries(STEP_OPTS);
+  const phases = [...new Set(GAPS.map(g => g[6]))];
+  return `<h2 id="a-gaps">${icon("flow")} Gaps to close, in order</h2>
+  <p class="muted">Risks first (cheap, nothing blocks them), then the decisions that block the build, then the build, then optimisation; clean-up runs alongside. The new digital marketing specialist owns most of the build from 7 November. Tap a gap for detail and to update it. <b>${done} of ${GAPS.length} closed.</b></p>
+  ${phases.map(ph => `<h3 class="gphase">${esc(ph)}</h3><div class="gaps">${GAPS.filter(g => g[6] === ph).map(([id, t, why, who, eff, needs, when, k]) => { const v = st("gap-" + id); return `<details class="card gap${v === "done" ? " done" : ""}" data-open-key="gap-${id}" ${S.secOpen?.["gap-" + id] ? "open" : ""}><summary><span class="gid">${id}</span><b>${esc(t)}</b><span class="pill gst st-${v}">${label[v] || v}</span></summary>
+   <div class="gbody"><div class="gm"><span class="pill ${GAP_KIND[k][0]}">${GAP_KIND[k][1]}</span>${needs ? `<span class="pill">Needs ${esc(needs)} first</span>` : ""}</div>
+   <p class="by">${esc(why)}</p><p class="by"><b>Owner:</b> ${esc(who)} · <b>Effort:</b> ${esc(eff)}</p><div>${sel("gap-" + id, STEP_OPTS)}</div></div></details>`; }).join("")}</div>`).join("")}`;
+}
+const SPINE = [
+  ["lead_submitted", "Lead submitted", "Website, app or WhatsApp form accepted by the backend", "Browser tag plus server event, same event_id"],
+  ["contacted", "Contacted", "First attempted call or consult in Freshsales", "Server event from Freshsales"],
+  ["docs_submitted", "Documents submitted", "Credit documents received", "Server event from Freshsales"],
+  ["credit_approved", "Credit approved", "Credit decision", "Analytics only until the Information Officer approves"],
+  ["contract_signed", "Contract signed", "SignNow contract signed", "Server event, one source (the date field)"],
+  ["installed", "Installed", "Zuper job completed and CoC issued", "Server event from Zuper"]
+];
+function vArch() {
+  if (!S.vm) { api("GET", "/api/value-model").then(v => { S.vm = v; render(true); }).catch(e => toast(e.message)); }
+  const vm = S.vm, open = S.data.issues.filter(x => x.state === "open"), sevRank = { high: 0, medium: 1, low: 2 };
+  const used = new Set(), grouped = ARCH_THEMES.map(t => { const its = open.filter(x => !used.has(x.id) && t[4].test(x.title + " " + (x.detail || ""))); its.forEach(x => used.add(x.id)); return its.sort((a, b) => sevRank[a.severity] - sevRank[b.severity]); });
+  const rest = open.filter(x => !used.has(x.id));
+  const probRow = k => vm?.stages.find(s => s.key === k)?.p;
+  const zar = n => n == null ? "–" : "R" + Math.round(n).toLocaleString("en-ZA");
+  const ADS = { yes: ["ok", "Send"], approval: ["bad", "Only with IO approval"], confirm: ["warn", "Confirm with IO"], no: ["", "Do not send"] };
+  const cmp = [
+    ["Lead definition", "One lead event; product is a parameter", "20 GA4 lead events, about 14 Google Ads conversions, a custom Meta event"],
+    ["Conversions", "Only real business outcomes are key events", "About 30 GA4 key events, including logins and clicks"],
+    ["Consent", "Tags wait for consent", "Meta tag hard-coded to consent = true; 14 tags on every page"],
+    ["Sensitive data", "Minimum data, access restricted", "Bank details, ID number and credit score open in Freshsales"],
+    ["Ownership", "Company owns every account; agencies are partners", "Pixels unverified; a Dark Matter Amplitude project; three Amplitude projects"],
+    ["Closed loop", "Contract and install sent back to ad platforms, with value", "Events exist in Amplitude but do not reach the ad platforms"],
+    ["Values", "Expected value per product and stage, one owned table", "No values on conversions"]
+  ];
+  return `<div class="eyebrow">Start here</div><h1>Target architecture</h1>
+  <p class="lede">Almost every problem in this guide has one root cause: nobody owns a single definition of the customer journey, so each platform, agency and developer tracked it their own way. The fix is to define the journey once and send that same definition everywhere.</p>
+  <div class="archnav">${[["a-gaps", "Gaps to close"], ["a-bcp", "Safe transition"], ["a-spine", "The journey"], ["a-flow", "How data flows"], ["a-cmp", "Best practice vs today"], ["a-pri", "Priorities"], ["a-sig", "Funnel signals"], ["a-val", "Conversion values"], ["a-seq", "What happens when"], ["a-dec", "Decisions needed"]].map(([id, l]) => `<button class="pill" data-act="scrollto" data-t="${id}">${l}</button>`).join("")}</div>
+  ${gapsBlock()}
+  <details class="asec" id="a-bcp" ${S.secOpen?.["a-bcp"] === false ? "" : "open"}><summary><h2>${icon("shield")} Safe transition and business continuity</h2></summary>
+  <div class="box warn"><b>Leads must not drop because of tracking changes</b>The Black Friday offer runs until 19 January. Until then nothing that drives bidding changes: no change to primary conversions, optimisation events or bid strategies. Everything new is built alongside the old setup and only reported. The switch happens after 19 January, one platform at a time, with a rollback ready.</div>
+  <div class="cmp">${[
+    ["1. Add before you remove", "Every new event, tag and conversion runs next to the old one for at least 2 to 4 weeks. Nothing old is removed until the new one has matched Freshsales for 30 days."],
+    ["2. New signals start as secondary", "Google Ads: secondary conversion (reported, not bid on). Meta and TikTok: new standard event on the same pixel, used only by new ad sets. GA4: a key event for reporting."],
+    ["3. Freshsales is the source of truth", "Judge every change by leads in Freshsales per day and per source, not by what a platform reports. A platform can report fewer conversions while real leads are unchanged (for example after the consent fix)."],
+    ["4. One platform at a time", "Switch Google first, then Meta, then TikTok, at least a week apart, so any drop has one cause."],
+    ["5. Do not reset learning on what works", "On Meta and TikTok, change the optimisation event on duplicated ad sets with a share of the budget, then move budget across as they perform. Never edit the event on the best live ad sets."],
+    ["6. Every change can be undone in minutes", "GTM: work in a workspace, use Preview, publish as a named version, export the container first; rollback = publish the previous version. Google Ads: switch primary and secondary back. Meta and TikTok: move budget back to the old ad sets."],
+    ["7. Change freeze", "No tracking or bidding changes on campaign launch days or in the last week of a promotion, and none from 20 November to 5 December (Black Friday peak) except the risk fixes."]
+  ].map(([t, x]) => `<div class="card cmprow" style="grid-template-columns:220px 1fr"><b>${t}</b><div>${x}</div></div>`).join("")}</div>
+  <div class="box bad"><b>Rollback triggers (check daily for 14 days after any change)</b><ul class="tight">
+   <li>Freshsales leads per day more than 20% below the same weekday's 4-week average for 2 days in a row: roll back the last change the same day.</li>
+   <li>A platform's reported conversions fall more than 30% while Freshsales leads hold: it is a tracking fault, not a demand drop; fix or roll back the tag before touching campaigns.</li>
+   <li>Cost per Freshsales lead on a platform rises more than 25% for 5 days after a switch: move budget back to the old ad sets or conversion.</li></ul>
+   <p class="by" style="margin:6px 0 0"><b>Who:</b> the specialist runs the change and the daily check; Franta approves each switch and any rollback; the agency is told 48 hours before every change to campaigns they run.</p></div>
+  <div class="box"><b>Before each change, a 5-point check</b><ul class="tight"><li>What changes, on which platform, and is it reported only or used for bidding?</li><li>Baseline for the last 4 weeks noted (Freshsales leads by source, cost per lead).</li><li>Rollback written down and tested (previous GTM version number, old conversion still active).</li><li>Not during a freeze window or a campaign launch.</li><li>Logged in this guide (Implementation log) with the date, so any later drop can be traced to it.</li></ul></div>
+  </details>
+
+  <h2 id="a-spine">${icon("target")} The journey, defined once</h2>
+  <p class="muted">Six events. Same names, same event_id, in every system. The product is a parameter, never part of the name.</p>
+  <ol class="spine">${SPINE.map(([k, l, w, how], i) => `<li><span class="sn">${i + 1}</span><div><b>${l}</b><code>${k}</code><div class="by">${w}</div><div class="by"><b>How:</b> ${how}</div></div></li>`).join("")}</ol>
+
+  <details class="asec" id="a-flow" ${S.secOpen?.["a-flow"] ? "open" : ""}><summary><h2>${icon("flow")} How data should flow</h2></summary>
+  <div class="flowcols">
+   <div class="card fc"><h3>Browser (fast, approximate)</h3><p>Website and app push one dataLayer event per spine step, with event_id and consent state. GTM sends it to GA4, Meta, TikTok and Google Ads.</p></div>
+   <div class="card fc"><h3>Server (accurate, complete)</h3><p>Freshsales, Zuper and respond.io send each step to the event ledger with the same event_id and the contract_id. The ledger forwards it to Amplitude and, for approved steps, to Google (Data Manager API), Meta (Conversions API) and TikTok (Events API).</p></div>
+  </div>
+  <div class="box"><b>Rules that make it work</b><ul class="tight">
+   <li>One event per business step; details go in parameters.</li><li>Every event carries an event_id so browser and server copies are deduplicated.</li>
+   <li>Click IDs (gclid, gbraid, fbclid, ttclid, ctwa_clid) are captured on the lead and kept on the contact; they are how a sale is tied back to an ad.</li>
+   <li>Tags fire only after consent; sensitive data (ID number, bank details, credit score) never reaches GTM, GA4, Amplitude or ad platforms.</li>
+   <li>Join systems on contract_id, not phone number alone (decision pending, see below).</li><li>Wetility owns every account; agencies get partner access.</li></ul></div>
+
+  </details>
+  <details class="asec" id="a-cmp" ${S.secOpen?.["a-cmp"] ? "open" : ""}><summary><h2>${icon("check")} Best practice vs today</h2></summary>
+  <div class="cmp">${cmp.map(([a, bp, now]) => `<div class="card cmprow"><b>${a}</b><div><span class="lbl ok">Best practice</span>${bp}</div><div><span class="lbl bad">Wetility today</span>${now}</div></div>`).join("")}</div>
+
+  </details>
+  <details class="asec" id="a-pri" ${S.secOpen?.["a-pri"] ? "open" : ""}><summary><h2>${icon("alert")} The three priorities and their open problems</h2></summary>
+  ${ARCH_THEMES.map((t, i) => `<div class="card prio"><div class="ph"><b>${t[1]}</b><span class="pill sun">${t[2]}</span></div><p class="muted">${t[3]}</p>
+   <ul class="tight">${t[5].map(x => `<li>${esc(x)}</li>`).join("")}</ul><p class="by"><b>Done when:</b> ${esc(t[6])}</p>
+   ${grouped[i].length ? `<details><summary>${grouped[i].length} open problem${grouped[i].length > 1 ? "s" : ""} in this priority</summary>${grouped[i].map(x => `<a class="plink" href="#issues"><span class="sev-${x.severity}">${x.severity}</span> ${esc(x.title)}</a>`).join("")}</details>` : `<p class="by">No open problems in this priority.</p>`}</div>`).join("")}
+  ${rest.length ? `<details class="card prio"><summary>${rest.length} other open problem${rest.length > 1 ? "s" : ""}</summary>${rest.map(x => `<a class="plink" href="#issues"><span class="sev-${x.severity}">${x.severity}</span> ${esc(x.title)}</a>`).join("")}</details>` : ""}
+
+  </details>
+  <details class="asec" id="a-sig" ${S.secOpen?.["a-sig"] ? "open" : ""}><summary><h2>${icon("chart")} Funnel signals back to the ad platforms</h2></summary>
+  <p class="muted">Optimise bidding on the deepest step that still has enough volume, and send the deeper steps as value and for reporting. Meta needs about 50 conversions per ad set per week, TikTok more than about 50 in 14 days; Google copes with fewer, especially with value-based bidding.</p>
+  <div class="cmp">${(vm?.stages || []).map((s, i) => { const a = ADS[s.ads] || ADS.yes; return `<div class="card cmprow"><b>${i + 1}. ${esc(s.label)}</b><div><code>${esc(s.key)}</code> <span class="pill ${a[0]}">${a[1]}</span></div></div>`; }).join("")}</div>
+  <div class="box"><b>How each step gets back</b><ul class="tight"><li><b>Google:</b> offline conversions through the Data Manager API (mandatory for new offline imports since 15 June 2026), matched on gclid or gbraid plus hashed email and phone.</li><li><b>Meta:</b> Conversions API. Website leads use web CAPI; WhatsApp leads use CAPI for Business Messaging (ctwa_clid, 7-day window).</li><li><b>TikTok:</b> Events API with ttclid.</li><li><b>GA4:</b> Measurement Protocol only accepts events up to 72 hours old, so late steps (contract, install) go to Amplitude and the ad platforms, not GA4.</li></ul><p class="by" style="margin:6px 0 0">Detail and steps: <a href="#pb410">playbook 4.10</a>.</p></div>
+
+  </details>
+  <details class="asec" id="a-val" ${S.secOpen?.["a-val"] ? "open" : ""}><summary><h2>${icon("sun")} Conversion values</h2></summary>
+  <div class="box info"><b>Value at a step = chance it reaches install × value of an installed customer for that product</b>Use contribution, not subscription revenue: OpCo margin on the system plus FinCo subscription over its life, net of O&amp;M, default and retention costs. Send values in ZAR on every event.</div>
+  <ul class="tight"><li><b>Never let the value reveal the credit result.</b> Base values on product, step and region only; a value that jumps after credit approval is itself a credit signal.</li><li><b>One model, owned by Wetility.</b> Agencies use this table; they do not invent values per platform. Review quarterly against actual conversion rates.</li><li><b>Start with values on lead and contacted;</b> switch bidding to value once volume allows. Contract and install values make ROAS reporting honest straight away.</li><li>Do it on the single lead_submitted event, not on today's 20 lead events.</li></ul>
+  ${vm ? valueTable(vm, zar) : `<p class="muted">Loading the value table…</p>`}
+
+  </details>
+  <details class="asec" id="a-seq" ${S.secOpen?.["a-seq"] ? "open" : ""}><summary><h2>${icon("calendar")} What happens when</h2></summary>
+  <ol class="seq">
+   <li><b>Now, before 7 November:</b> risk fixes that do not touch bidding (Freshsales field access, Meta consent, credit-signal decision, pixel ownership).</li>
+   <li><b>Week of 7 November (specialist starts):</b> baseline and rollback triggers, event spine and join key signed off, value inputs requested, session recording masked.</li>
+   <li><b>November to December:</b> build the new setup alongside the old one and report it only. Nothing old is removed and no bidding changes. Freeze from 20 November to 5 December except risk fixes.</li>
+   <li><b>December:</b> server events and postbacks sent as secondary conversions, with values, and checked against Freshsales.</li>
+   <li><b>From 20 January (after the Black Friday offer ends):</b> switch bidding one platform at a time (Google, then Meta, then TikTok), a week apart, with the rollback triggers watched daily.</li>
+   <li><b>From late February:</b> after 30 days of parity, remove the old events, tags and conversions.</li></ol>
+
+  </details>
+  <details class="asec" id="a-dec" ${S.secOpen?.["a-dec"] ? "open" : ""}><summary><h2>${icon("gate")} Decisions needed</h2></summary>
+  <div class="cmp">${[
+    ["Credit-derived signals to ad platforms", "Information Officer", "Can the 620+ or credit-approved signal go to ad platforms, on what legal basis? Until decided, step 4 stays out of any new setup."],
+    ["Value of an installed customer per product", "Finance", "Contribution per product (OpCo margin plus FinCo subscription net of costs), for the value table."],
+    ["Monthly volumes and conversion rates per step", "Sales operations (Freshsales report)", "Decides which step to optimise on and fills the probabilities."],
+    ["Identifier for joining systems", "Josh, Beryl, Timothy", "Move from phone number to contract_id as the canonical join (playbook 4.5)."],
+    ["Which Amplitude project is the source of truth", "Franta", "Recommended: 89b022e4, which already holds the funnel."]
+  ].map(([d, who, what]) => `<div class="card cmprow"><b>${d}</b><div><span class="lbl">Who</span>${who}</div><div>${what}</div></div>`).join("")}</div></details>`;
+}
+function valueTable(vm, zar) {
+  const edit = canWrite() && S.vmEdit, st = vm.stages;
+  if (edit) return `<form class="f card" data-form="vm-save" style="padding:16px">
+    <h3 style="margin:0">Edit the value model</h3>
+    <p class="by">Probability that a lead at each step becomes an installed customer (0 to 1, for example 0.04), and the value of an installed customer per product in rand.</p>
+    <div class="vmgrid">${st.map((s, i) => `<label>${esc(s.label)}<input name="p_${i}" inputmode="decimal" value="${s.p ?? ""}" placeholder="e.g. 0.04"></label>`).join("")}</div>
+    <h3 style="margin:10px 0 0">Value of an installed customer (R)</h3>
+    <div class="vmgrid">${vm.products.map((p, i) => `<label>${esc(p.name)}<input name="v_${i}" inputmode="numeric" value="${p.value ?? ""}" placeholder="e.g. 40000"><input type="hidden" name="n_${i}" value="${esc(p.name)}"></label>`).join("")}
+     <label>Add a product<input name="n_new" placeholder="Product name"></label></div>
+    <label>Where the values come from<textarea name="basis" rows="2" placeholder="e.g. Finance model Oct 2026: OpCo margin + FinCo 15-year subscription NPV net of O&M and default">${esc(vm.basis || "")}</textarea></label>
+    <div class="acts"><button class="btn primary" type="submit">Save values</button><button class="btn ghost" type="button" data-act="vm-cancel">Cancel</button></div></form>`;
+  const filled = vm.products.some(p => p.value != null) && st.some(s => s.p != null);
+  return `<div class="card" style="padding:14px 16px">
+   <div class="ph"><b>Value table</b>${canWrite() ? `<button class="btn sm" data-act="vm-edit">${filled ? "Edit values" : "Fill in values"}</button>` : ""}</div>
+   ${filled ? "" : `<p class="by">Not filled in yet. Needs the installed-customer value per product from finance and the conversion rate per step from Freshsales.</p>`}
+   <div class="vmtable">${vm.products.map(p => `<div class="vmrow"><b>${esc(p.name)}</b><span class="by">Installed: ${zar(p.value)}</span><div class="vmcells">${st.map(s => `<span class="vmc"><span class="by">${esc(s.label.split(" (")[0])}</span>${p.value != null && s.p != null ? zar(p.value * s.p) : "–"}</span>`).join("")}</div></div>`).join("")}</div>
+   ${vm.basis ? `<p class="by"><b>Basis:</b> ${esc(vm.basis)}</p>` : ""}${vm.updatedAt ? `<p class="by">Last updated ${fmtDT(vm.updatedAt)}${vm.updatedBy ? " by " + esc(vm.updatedBy) : ""}</p>` : ""}</div>`;
+}
+
 // ---------- view: more (phone menu) ----------
 function vMore() {
   const openI = S.data.issues.filter(x => x.state === "open").length;
   const item = (href, ic, t, sub, extra = "") => `<a class="tile link morei" href="${href}">${icon(ic)}<div class="l"><b>${t}</b>${sub ? `<br>${sub}` : ""}</div>${extra}${icon("chev", "sm go")}</a>`;
   const btn = (act, ic, t) => `<button class="tile link morei" data-act="${act}">${icon(ic)}<div class="l"><b>${t}</b></div>${icon("chev", "sm go")}</button>`;
   return `<h1>More</h1>
+  <div class="morelist">${item("#arch", "target", "Target architecture", "Start here: what to fix, in what order, and why")}</div>
   <h3 class="moreh">Knowledge</h3><div class="morelist">${item("#kb", "bulb", "Vendor guidance", "Current step-by-step guides per platform")}${item("#ref", "table", "Schema & naming rules", "How events and fields must be named")}</div>
   <h3 class="moreh">Results</h3><div class="morelist">${item("#issues", "alert", "Problems and fixes", `${openI} open`)}${item("#results", "chart", "Results & KPIs", "Is the implementation delivering?")}${item("#log", "log", "Implementation log", "What was done, when, by whom")}</div>
   ${isAdmin() ? `<h3 class="moreh">Admin</h3><div class="morelist">${item("#settings", "key", "Settings & connections", "API keys and syncs")}${item("#admin", "shield", "People and access", "Invite people, roles")}${item("#activity", "log", "Activity", "Every change, newest first")}</div>` : ""}
@@ -784,7 +959,7 @@ const AREAS = [
   { id: "results", label: "Results", icon: "chart", href: "#results" }];
 function areaOf(h) {
   if (!h || h === "overview") return "home";
-  if (["playbooks", "read", "gates", "ws", "qa", "approval", "day1", "esc"].includes(h) || PB.some(p => p.id === h)) return "plan";
+  if (["playbooks", "arch", "read", "gates", "ws", "qa", "approval", "day1", "esc"].includes(h) || PB.some(p => p.id === h)) return "plan";
   if (["registry", "consistency", "flow", "import", "add"].includes(h) || h.startsWith("f-") || h.startsWith("sys-")) return "track";
   if (h === "kb" || h.startsWith("kb-") || h === "ref") return "kb";
   if (["results", "log", "issues"].includes(h)) return "results";
@@ -794,7 +969,7 @@ function areaOf(h) {
 }
 function subnav(area) {
   const openI = S.data.issues.filter(x => x.state === "open").length;
-  if (area === "plan") return [["Start", [["playbooks", "All playbooks"], ["read", "Read this first"], ["gates", "Gates G0–G6"], ["ws", "Workstreams"]]],
+  if (area === "plan") return [["Start", [["arch", "Target architecture"], ["playbooks", "All playbooks"], ["read", "Read this first"], ["gates", "Gates G0–G6"], ["ws", "Workstreams"]]],
     ["Playbooks", PB.map(p => [p.id, p.title, p])], ["Checks", [["qa", "QA test cases"], ["approval", "Final approval"], ["day1", "Day-one tasks"], ["esc", "Escalation & cadence"]]]];
   if (area === "track") return [["Tracking", [["registry", "Registry"], ["consistency", "Consistency check", null, S.A.problems], ["flow", "Data flow"], ["import", "Import current setup"], ["add", "Add one item"]]]];
   if (area === "kb") return [["Knowledge", [["kb", "Vendor guidance"], ["ref", "Schema & naming rules"]]]];
@@ -810,9 +985,9 @@ function titleOf(h) {
   if (h.startsWith("kb-")) return S.data.kb.find(k => k.id === h.slice(3))?.title || "Article";
   return { overview: "Home", playbooks: "All playbooks", read: "Read this first", gates: "Gates", ws: "Workstreams", qa: "QA test cases", approval: "Final approval", day1: "Day-one tasks", esc: "Escalation & cadence",
     registry: "Tracking registry", consistency: "Consistency check", flow: "Data flow", import: "Import current setup", add: "Add one item", kb: "Vendor guidance", ref: "Schema & naming rules",
-    results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", settings: "Settings & connections", more: "More", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
+    results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", settings: "Settings & connections", more: "More", arch: "Target architecture", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
 }
-const VIEWS = { overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings, more: vMore };
+const VIEWS = { overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings, more: vMore, arch: vArch };
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (S.me?.must_change) return () => vPassword(true);
@@ -932,6 +1107,7 @@ document.addEventListener("input", e => {
   if (e.target.id === "gq") { clearTimeout(S._qt); S._qt = setTimeout(() => { S.q = e.target.value; if (curKey() !== "search") location.hash = "search"; else render(true); }, 200); }
   if (e.target.id === "regq") { clearTimeout(S._rt); S._rt = setTimeout(() => { S.regQ = e.target.value; const pos = e.target.selectionStart; render(); const el = $("#regq"); el.focus(); el.setSelectionRange(pos, pos); }, 200); }
 });
+document.addEventListener("toggle", e => { const d = e.target; if (!(d instanceof HTMLDetailsElement)) return; const k = d.dataset.openKey || (d.classList.contains("asec") ? d.id : ""); if (k) (S.secOpen ||= {})[k] = d.open; }, true);
 document.addEventListener("change", async e => {
   if (e.target.matches("select[data-nav]")) { if (e.target.value) location.hash = e.target.value; return; }
   const el = e.target;
@@ -969,6 +1145,8 @@ document.addEventListener("submit", async e => {
       case "merge": await api("POST", `/api/fields/${id}/merge`, { into: d.into }); toast("Merged"); await load(); location.hash = "f-" + d.into; return;
       case "impl": { const body = { ...d, std: fd.has("std") }; if (id) await api("PUT", "/api/impls/" + id, body); else await api("POST", "/api/impls", body); toast(id ? "Saved" : "Added to registry");
         if (!id) { S.prefSys = null; S.prefField = null; await load(); location.hash = d.field_id ? "f-" + d.field_id : "registry"; return; } break; }
+      case "vm-save": { const st = S.vm.stages.map((x, i) => ({ ...x, p: d["p_" + i] })); const products = S.vm.products.map((x, i) => ({ name: d["n_" + i], value: d["v_" + i] })); if ((d.n_new || "").trim()) products.push({ name: d.n_new.trim(), value: null });
+        S.vm = await api("PUT", "/api/value-model", { stages: st, products, basis: d.basis }); S.vmEdit = false; toast("Values saved"); render(true); return; }
       case "conn-save": { const v = await api("POST", "/api/connections/" + id, d); connSet(v); S.connOpen = id; toast(v.configured ? "Saved. Now click Test connection." : "Saved. Still needed: " + v.missing.join(", ")); render(true); return; }
       case "invite": { const r = await api("POST", "/api/users", d); S.tempPw = { email: r.email, pw: r.tempPassword }; S.users = null; f.reset(); render(true); return; }
       case "password": await api("POST", "/api/password", d); toast("Password saved"); S.me.must_change = false; await load(); location.hash = "overview"; render(); return;
@@ -987,7 +1165,7 @@ document.addEventListener("click", async e => {
   if (act === "cmdk-all") { closeCmdk(); return; }
   if (act === "menu") { S.menu = !S.menu; renderMenu(); return; }
   if (act === "go") { S.menu = false; renderMenu(); location.hash = b.dataset.h; return; }
-  if (act === "scrollto") { document.getElementById(b.dataset.t)?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  if (act === "scrollto") { const t = document.getElementById(b.dataset.t); if (t instanceof HTMLDetailsElement) t.open = true; t?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (act === "pbtab") { S.pbTab[b.dataset.pb] = b.dataset.tab; S.inline = null; render(true); return; }
   if (act === "inline") { S.inline = S.inline === b.dataset.k ? null : b.dataset.k || null; render(true); setTimeout(() => document.querySelector("#view .inline input:not([type=hidden]), #view .inline textarea")?.focus(), 0); return; }
   if (act === "kbf") { S.kbF = b.dataset.f; render(true); return; }
@@ -1012,6 +1190,8 @@ document.addEventListener("click", async e => {
       case "reopen": await api("PATCH", "/api/issues/" + id, { state: "open" }); toast("Reopened"); break;
       case "reset": { const r = await api("PATCH", "/api/users/" + id, { reset: true }); S.tempPw = { email: b.dataset.email, pw: r.tempPassword }; S.users = null; return render(true); }
       case "user-del": await api("DELETE", "/api/users/" + id); S.users = null; toast("Removed"); break;
+      case "vm-edit": S.vmEdit = true; return render(true);
+      case "vm-cancel": S.vmEdit = false; return render(true);
       case "conn-open": S.connOpen = S.connOpen === id ? "" : id; return render(true);
       case "conn-test": b.disabled = true; { const v = await api("POST", `/api/connections/${id}/test`); connSet(v); toast(v.lastTest?.ok ? "Connection works" : "Connection failed"); } return render(true);
       case "conn-remove": connSet(await api("DELETE", "/api/connections/" + id)); if (S.connSync) delete S.connSync[id]; toast("Keys removed"); return render(true);

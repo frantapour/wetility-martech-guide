@@ -428,6 +428,36 @@ app.get("/api/export/:what.csv", auth, wrap(async (req, res) => {
 }));
 
 require("./connectors").routes(app, { auth, isAdmin, wrap, bad });
+// Conversion value model: products x funnel stages, owned in one place (configuration, no customer data).
+const VM_DEFAULT = {
+  currency: "ZAR",
+  stages: [
+    { key: "lead_submitted", label: "Lead submitted", p: null, ads: "yes" },
+    { key: "contacted", label: "Contacted (first call or consult)", p: null, ads: "yes" },
+    { key: "docs_submitted", label: "Credit documents submitted", p: null, ads: "yes" },
+    { key: "credit_approved", label: "Credit approved", p: null, ads: "approval" },
+    { key: "contract_signed", label: "Contract signed", p: null, ads: "confirm" },
+    { key: "installed", label: "Installed (CoC issued)", p: 1, ads: "yes" }
+  ],
+  products: ["Pace Mini", "Pace Medi", "Pace Medi Plus", "Pace Maxi", "Pace Maxi 3PH", "Pace Mega", "Pace Xtra", "Pace Backup", "Pace Core", "Lift Series", "Rise Series", "Luxe Series", "Flare"].map(name => ({ name, value: null })),
+  basis: "", updatedAt: null, updatedBy: null
+};
+app.get("/api/value-model", auth, wrap(async (req, res) => {
+  const r = await q("SELECT value FROM settings WHERE key='value_model'");
+  res.json(r.rowCount ? JSON.parse(r.rows[0].value) : VM_DEFAULT);
+}));
+app.put("/api/value-model", auth, canWrite, wrap(async (req, res) => {
+  const b = req.body || {}, num = (v, max) => { if (v === "" || v == null) return null; const n = Number(String(v).replace(/[\s,R]/g, "")); return Number.isFinite(n) && n >= 0 && n <= max ? n : null; };
+  const vm = {
+    currency: "ZAR",
+    stages: (Array.isArray(b.stages) ? b.stages : VM_DEFAULT.stages).slice(0, 12).map((x, i) => ({ key: String(x.key || VM_DEFAULT.stages[i]?.key || "stage_" + i).slice(0, 60), label: String(x.label || "").slice(0, 80), p: num(x.p, 1), ads: ["yes", "approval", "confirm", "no"].includes(x.ads) ? x.ads : "yes" })),
+    products: (Array.isArray(b.products) ? b.products : []).slice(0, 60).map(x => ({ name: String(x.name || "").trim().slice(0, 60), value: num(x.value, 1e9) })).filter(x => x.name),
+    basis: String(b.basis || "").slice(0, 1000), updatedAt: new Date().toISOString(), updatedBy: req.user.name
+  };
+  await q(`INSERT INTO settings (key,value,updated_by,updated_at) VALUES ('value_model',$1,$2,now()) ON CONFLICT (key) DO UPDATE SET value=$1, updated_by=$2, updated_at=now()`, [JSON.stringify(vm), req.user.id]);
+  await q("INSERT INTO audit (by_user,entity,entity_id,action) VALUES ($1,'settings','value_model','value model updated')", [req.user.id]);
+  res.json(vm);
+}));
 
 app.get("/healthz", (req, res) => res.json({ ok: true }));
 app.get("*", (req, res) => res.sendFile(path.join(__dirname, "..", "public", "index.html")));
