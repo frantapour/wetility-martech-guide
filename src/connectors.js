@@ -179,9 +179,11 @@ const CONNECTORS = [
       return u.replace(/\/+$/, "") + "/api";
     },
     async _z(c, path) { if (!c.apiKey) throw fail("Save the API key first."); const base = await this._base(c); return http(base + path, { headers: { "x-api-key": c.apiKey }, label: "Zuper" }); },
-    async test(c) { const base = await this._base(c); const j = await this._z(c, "/service/notifications/webhook"); return `Connected to ${base}. ${(j.data || []).length} webhook(s) visible.`; },
+    // Zuper documents webhooks under two paths; try both and keep whichever answers.
+    async _hooks(c) { let last; for (const path of ["/webhooks", "/service/notifications/webhook", "/service/notifications/webhooks"]) { try { const j = await this._z(c, path); const list = Array.isArray(j) ? j : j.data || j.webhooks || []; console.log("ZUPER webhooks path", path, "items", list.length); return { path, list }; } catch (e) { last = e; if (e.status !== 404) throw e; } } throw last; },
+    async test(c) { const base = await this._base(c); const { path, list } = await this._hooks(c); return `Connected to ${base} (${path}). ${list.length} webhook(s) visible.`; },
     async sync(c) { const items = [], report = [];
-      try { const j = await this._z(c, "/service/notifications/webhook"); const list = j.data || [];
+      try { const { list } = await this._hooks(c);
         list.forEach(w => items.push({ system: "zuper", container: "Webhooks", kind: "webhook event", name: Importer.slug(w.webhook_name || w.name || w.webhook_uid || "webhook"), label: w.webhook_name || w.name || "", parent: w.module || w.module_name || "", description: `Event ${w.event || w.webhook_event || "?"} → ${w.url || w.webhook_url || w.request_url || "?"}. ${w.is_active === false || w.status === "INACTIVE" ? "INACTIVE. " : ""}Synced from Zuper.` }));
         report.push({ part: "Webhooks", ok: true, count: list.length }); } catch (e) { report.push({ part: "Webhooks", ok: false, error: e.message }); }
       return { items, report }; }
