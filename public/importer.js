@@ -83,7 +83,8 @@ function parseStages(text) {
 // CSV with a header row. Recognised columns: name, label, type/kind, parent/group, description, container.
 function parseCSV(text) {
   const rows = []; let row = [], cell = "", q = false;
-  const s = String(text || "");
+  // GA4 and Google Ads downloads start with "#" comment lines or a report title line before the header.
+  const s = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => !/^\s*#/.test(l)).join("\n");
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     if (q) { if (c === '"' && s[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
@@ -94,9 +95,12 @@ function parseCSV(text) {
   if (cell || row.length) { row.push(cell); rows.push(row); }
   const clean = rows.filter(r => r.some(x => x.trim()));
   if (clean.length < 2) return { container: "", items: [] };
+  const KNOWN = ["name", "apiname", "eventname", "fieldname", "conversionaction", "conversionname", "label", "displayname", "parametername", "propertyname", "status", "jobstatus", "event"];
+  let h0 = clean.slice(0, 6).findIndex(r => r.some(c => KNOWN.includes(norm(c)))); if (h0 < 0) h0 = 0;
+  clean.splice(0, h0);
   const head = clean[0].map(h => norm(h));
   const col = (...names) => head.findIndex(h => names.includes(h));
-  const ci = { name: col("name", "apiname", "eventname", "key", "fieldname", "internalname"), label: col("label", "displayname", "fieldlabel", "title"), kind: col("type", "kind", "itemtype"), parent: col("parent", "group", "section", "folder"), desc: col("description", "notes", "whatitmeasures"), container: col("container", "module", "property", "account") };
+  const ci = { name: col("name", "apiname", "eventname", "key", "fieldname", "internalname", "parametername", "propertyname", "userpropertyname", "conversionaction", "conversionname", "conversionactionname", "event", "customevent", "status", "jobstatus", "statusname"), label: col("label", "displayname", "fieldlabel", "title", "dimensionname", "metricname"), kind: col("kind", "itemtype"), parent: col("parent", "group", "section", "folder", "category", "goal", "conversioncategory", "scope", "module"), desc: col("description", "notes", "whatitmeasures", "source", "countingmethod", "count", "type"), container: col("container", "property", "account", "accountname", "pixel", "dataset") };
   if (ci.name < 0 && ci.label < 0) ci.name = 0;
   let container = "";
   const items = clean.slice(1).map(r => {
@@ -104,7 +108,7 @@ function parseCSV(text) {
     if (!container && g(ci.container)) container = g(ci.container);
     const label = g(ci.label), name = g(ci.name) || slug(label);
     return { name, label: label && label !== name ? label : "", kind: g(ci.kind), parent: g(ci.parent), description: g(ci.desc) };
-  }).filter(x => x.name);
+  }).filter(x => x.name && !/^(grand )?totals?:?$/i.test(x.name));
   return { container, items };
 }
 
