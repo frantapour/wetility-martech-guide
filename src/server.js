@@ -569,15 +569,6 @@ app.use((err, req, res, next) => {
   q(`SELECT (SELECT count(*) FROM impls) n_impls, (SELECT count(*) FROM issues) n_issues,
       (SELECT sum(length(row_to_json(t)::text)) FROM impls t) + (SELECT sum(length(row_to_json(t)::text)) FROM issues t) + (SELECT coalesce(sum(length(row_to_json(t)::text)),0) FROM kb t) + (SELECT coalesce(sum(length(row_to_json(t)::text)),0) FROM fields t) AS state_bytes`)
     .then(r => console.log("STATE SIZE", JSON.stringify(r.rows[0]))).catch(() => {});
-  // Temporary usage check (remove after reading)
-  q(`SELECT u.name, u.role, u.must_change, u.created_at::date AS added, to_char(u.last_login AT TIME ZONE 'Africa/Johannesburg','YYYY-MM-DD HH24:MI') AS last_login,
-       (SELECT count(*) FROM statuses s WHERE s.by_user=u.id) AS statuses_set,
-       (SELECT count(*) FROM issues i WHERE i.by_user=u.id) AS issues_logged,
-       (SELECT count(*) FROM comments c WHERE c.by_user=u.id) AS comments,
-       (SELECT count(*) FROM audit a WHERE a.by_user=u.id) AS audit_actions,
-       (SELECT to_char(max(a.at) AT TIME ZONE 'Africa/Johannesburg','YYYY-MM-DD HH24:MI') FROM audit a WHERE a.by_user=u.id) AS last_action
-     FROM users u ORDER BY u.last_login DESC NULLS LAST`).then(r => console.log("USAGE", JSON.stringify(r.rows))).catch(e => console.log("USAGE ERR", e.message));
-  q(`SELECT to_char(expire AT TIME ZONE 'Africa/Johannesburg','YYYY-MM-DD HH24:MI') exp, sess->>'uid' uid FROM session ORDER BY expire DESC LIMIT 20`).then(r => console.log("SESSIONS", JSON.stringify(r.rows))).catch(e => console.log("SESSIONS ERR", e.message));
   await ensureAdmin();
   app.listen(PORT, () => console.log(`MarTech guide listening on ${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });
