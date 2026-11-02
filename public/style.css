@@ -582,3 +582,14 @@ ol.seq{padding-left:20px}ol.seq li{margin:8px 0}
 .task-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .task-open{margin-left:auto;display:inline-flex;align-items:center;gap:2px;min-height:36px;font-size:14px}
 .task-t{margin:8px 0 10px;line-height:1.45}
+/* How this app works */
+.lead{font-size:17px;line-height:1.55;max-width:72ch}
+.guide-goal{padding:16px 18px;margin:0 0 16px;line-height:1.55}
+.guide-goal p{margin:0}
+.guide-list{margin:10px 0 0;padding-left:20px}.guide-list li{margin:0 0 8px}
+.guide-secs{display:grid;gap:10px;margin:0 0 16px}
+.guide-sec{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;text-decoration:none;color:inherit}
+.guide-sec p{margin:4px 0 8px;color:var(--fg-2);line-height:1.45}
+.guide-sec>div{flex:1}
+.guide-sec:hover{border-color:var(--sun-line)}
+.guidetile{margin:0 0 10px}

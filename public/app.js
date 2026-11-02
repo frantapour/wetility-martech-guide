@@ -221,6 +221,46 @@ function execBlock() {
     <p class="muted" style="font-size:12px;margin:8px 0 0">Findings as of ${esc(sm.asOf)}. The downloads add ownership by platform, all actions with owners, gaps and open problems.</p></details>` : ""}
   </section>`;
 }
+// ---------- how this app works ----------
+function vGuide() {
+  const sec = (href, ic, name, what, who) => `<a class="card guide-sec" href="${href}">${icon(ic)}<div><b>${name}</b><p>${what}</p><span class="pill">${who}</span></div>${icon("chev", "sm go")}</a>`;
+  return `<div class="eyebrow">Start here</div><h1>How this app works</h1>
+  <p class="lead">This app is Wetility's single place to fix how we measure marketing: who owns each account, which signals go to Google, Meta and TikTok, how a lead is followed to an installed customer, and who is doing what by when.</p>
+
+  <h2>${icon("target")} What we want to achieve</h2>
+  <div class="card guide-goal"><p><b>Every lead and every customer counted once, in accounts Wetility owns, without putting customers' private data at risk, and with the ad platforms learning from installed customers instead of form fills.</b> And we get there without leads dropping while we change things.</p>
+   <ol class="guide-list">
+    <li><b>Own it:</b> every ad account, pixel and analytics project sits in a Wetility account, and agencies work through partner access.</li>
+    <li><b>Protect it:</b> bank, ID and credit data stay out of marketing tools and ad platforms unless the Information Officer approves.</li>
+    <li><b>One lead, one definition:</b> one lead event everywhere, instead of 20 different ones.</li>
+    <li><b>Close the loop:</b> contract signed and installed are sent back to Google, Meta and TikTok, with a value, so they find customers and not just form fills.</li>
+    <li><b>One version of the truth:</b> Freshsales is the source for leads, contracts and installs by source, next to what each platform claims.</li>
+    <li><b>Change safely:</b> build the new setup alongside the old one, freeze during Black Friday, switch one platform at a time after 19 January, and roll back if leads drop.</li>
+   </ol></div>
+
+  <h2>${icon("radar")} The website's job</h2>
+  <div class="card guide-goal"><p>wetility.energy turns visitors into qualified leads. A visitor arrives from Google, TikTok, Meta or WhatsApp, picks a bundle (PACE Backup to PACE Mega) or asks for help choosing, and submits the Let's talk or subscribe form. That form, and what happens after it in Freshsales and Zuper, is what every tracking change in this app is about.</p>
+   <p class="muted" style="margin:8px 0 0">Today: about 19,000 visits a month; Google and TikTok bring most of them; 8.6% of visits hit buttons that do not respond, mostly in the bundle selector; organic search is mostly people already searching for Wetility. The goal: every form submission recorded once with the ad click that brought it, a bundle selector that works on every phone, and search pages that bring in new customers, not only existing ones.</p></div>
+
+  <h2>${icon("book")} The five sections</h2>
+  <div class="guide-secs">
+   ${sec("#overview", "home", "Home", "The executive summary with Word and Excel downloads, your assigned tasks, and the next actions.", "Everyone")}
+   ${sec("#mine", "user", "My tasks", "Everything assigned to you, with due dates. Change the status here as you go.", "Everyone with tasks")}
+   ${sec("#arch", "target", "Plan", "The target architecture: what to fix, in what order, who owns it, and how to change without losing leads. Playbooks hold the step-by-step detail.", "Franta, Thato, Josh")}
+   ${sec("#issues", "alert", "Problems", "Everything found in the platforms, with severity and what to do. Log new problems here.", "Everyone")}
+   ${sec("#more", "menu", "More", "The tracking registry (every event, field and tag), vendor guidance, results, settings and connections.", "Thato, Josh, admins")}
+  </div>
+
+  <h2>${icon("check")} How to use it</h2>
+  <div class="card guide-goal"><ol class="guide-list">
+   <li><b>Start on Home.</b> Read the executive summary and check "Assigned to you".</li>
+   <li><b>Work your tasks.</b> Open My tasks, do the work, set the status to In progress or Done. If you are stuck, set Blocked and log a problem.</li>
+   <li><b>Assign, do not chase.</b> Every task starts unassigned. Editors pick an owner on the task; it then appears on that person's Home and My tasks.</li>
+   <li><b>Weekly:</b> Franta reviews overdue actions and high problems on Monday and downloads the summary for leadership.</li>
+  </ol>
+  <p class="muted" style="margin:8px 0 0">Roles: admins manage people and connections; editors assign and update any task; viewers read everything and can update the tasks assigned to them.</p></div>`;
+}
+
 // ---------- tasks and owners ----------
 function taskInfo(k) {
   let m;
@@ -278,6 +318,7 @@ function vOverview() {
   <div class="cols"><div>
    ${myTasksBlock()}
    ${execBlock()}
+   <a class="tile link guidetile" href="#guide">${icon("bulb")}<div class="l"><b>New here? How this app works</b><br>What we want to achieve, the five sections, and how to use them</div>${icon("chev", "sm go")}</a>
    <a class="tile link starthere" href="#arch">${icon("target")}<div class="l"><b>Start here: target architecture</b><br>${GAPS.filter(g => st("gap-" + g[0]) === "done").length} of ${GAPS.length} gaps closed. What to fix, in what order, and why</div>${icon("chev", "sm go")}</a>
    <h2>${icon("check")} Next actions</h2>
    ${actionsBlock(5)}
@@ -1020,39 +1061,38 @@ function vMore() {
   const item = (href, ic, t, sub, extra = "") => `<a class="tile link morei" href="${href}">${icon(ic)}<div class="l"><b>${t}</b>${sub ? `<br>${sub}` : ""}</div>${extra}${icon("chev", "sm go")}</a>`;
   const btn = (act, ic, t) => `<button class="tile link morei" data-act="${act}">${icon(ic)}<div class="l"><b>${t}</b></div>${icon("chev", "sm go")}</button>`;
   return `<h1>More</h1>
-  <div class="morelist">${item("#mine", "user", "My tasks", `${myOpenCount()} open`)}${item("#arch", "target", "Target architecture", "Start here: what to fix, in what order, and why")}</div>
-  <h3 class="moreh">Knowledge</h3><div class="morelist">${item("#kb", "bulb", "Vendor guidance", "Current step-by-step guides per platform")}${item("#ref", "table", "Schema & naming rules", "How events and fields must be named")}</div>
-  <h3 class="moreh">Results</h3><div class="morelist">${item("#issues", "alert", "Problems and fixes", `${openI} open`)}${item("#results", "chart", "Results & KPIs", "Is the implementation delivering?")}${item("#log", "log", "Implementation log", "What was done, when, by whom")}</div>
+  <div class="morelist">${item("#guide", "bulb", "How this app works", "What we want to achieve and what each section is for")}</div>
+  <h3 class="moreh">Tracking</h3><div class="morelist">${item("#registry", "radar", "Tracking registry", "Every event, field and tag in every platform")}${item("#consistency", "check", "Consistency check", `${S.A.problems} to review`)}${item("#flow", "flow", "Data flow", "How data moves between systems")}${item("#import", "table", "Import current setup", "Paste or upload a platform export")}</div>
+  <h3 class="moreh">Guidance</h3><div class="morelist">${item("#kb", "bulb", "Vendor guidance", "Current step-by-step guides per platform")}${item("#ref", "table", "Schema & naming rules", "How events and fields must be named")}</div>
+  <h3 class="moreh">Results</h3><div class="morelist">${item("#results", "chart", "Results & KPIs", "Is the implementation delivering?")}${item("#log", "log", "Implementation log", "What was done, when, by whom")}</div>
   ${isAdmin() ? `<h3 class="moreh">Admin</h3><div class="morelist">${item("#settings", "key", "Settings & connections", "API keys and syncs")}${item("#admin", "shield", "People and access", "Invite people, roles")}${item("#activity", "log", "Activity", "Every change, newest first")}</div>` : ""}
   <h3 class="moreh">Account</h3><div class="morelist">${item("#password", "key", "Change password", esc(S.me.email))}${btn("logout", "logout", "Sign out")}</div>`;
 }
 
 // ---------- shell ----------
+// Five places, the same on desktop and phone: Home, My tasks, Plan, Problems, More.
 const AREAS = [
   { id: "home", label: "Home", icon: "home", href: "#overview" },
-  { id: "plan", label: "Playbooks", icon: "book", href: "#playbooks" },
-  { id: "track", label: "Tracking", icon: "radar", href: "#registry" },
-  { id: "kb", label: "Knowledge", icon: "bulb", href: "#kb" },
-  { id: "results", label: "Results", icon: "chart", href: "#results" }];
+  { id: "tasks", label: "My tasks", icon: "user", href: "#mine" },
+  { id: "plan", label: "Plan", icon: "target", href: "#arch" },
+  { id: "results", label: "Problems", icon: "alert", href: "#issues" },
+  { id: "more", label: "More", icon: "menu", href: "#more" }];
 function areaOf(h) {
-  if (!h || h === "overview" || h === "mine") return "home";
+  if (!h || h === "overview" || h === "guide") return "home";
+  if (h === "mine") return "tasks";
   if (["playbooks", "arch", "read", "gates", "ws", "qa", "approval", "day1", "esc"].includes(h) || PB.some(p => p.id === h)) return "plan";
-  if (["registry", "consistency", "flow", "import", "add"].includes(h) || h.startsWith("f-") || h.startsWith("sys-")) return "track";
-  if (h === "kb" || h.startsWith("kb-") || h === "ref") return "kb";
   if (["results", "log", "issues"].includes(h)) return "results";
-  if (["admin", "activity", "password", "settings"].includes(h)) return "admin";
-  if (h === "more") return "more";
-  return "home";
+  return "more";
 }
 function subnav(area) {
   const openI = S.data.issues.filter(x => x.state === "open").length;
-  if (area === "plan") return [["Start", [["arch", "Target architecture"], ["playbooks", "All playbooks"], ["read", "Read this first"], ["gates", "Gates G0–G6"], ["ws", "Workstreams"]]],
-    ["Playbooks", PB.map(p => [p.id, p.title, p])], ["Checks", [["qa", "QA test cases"], ["approval", "Final approval"], ["day1", "Day-one tasks"], ["esc", "Escalation & cadence"]]]];
-  if (area === "track") return [["Tracking", [["registry", "Registry"], ["consistency", "Consistency check", null, S.A.problems], ["flow", "Data flow"], ["import", "Import current setup"], ["add", "Add one item"]]]];
-  if (area === "kb") return [["Knowledge", [["kb", "Vendor guidance"], ["ref", "Schema & naming rules"]]]];
-  if (area === "results") return [["Results", [["results", "Results & KPIs"], ["issues", "Problems and fixes", null, openI], ["log", "Implementation log"]]]];
-  if (area === "admin") return [["Admin", [["admin", "People and access"], ["settings", "Settings & connections"], ["activity", "Activity"], ["password", "Change password"]]]];
-  return [["Shortcuts", [["playbooks", "All playbooks"], ["registry", "Tracking registry"], ["issues", "Problems and fixes", null, openI], ["import", "Import current setup"]]]];
+  if (area === "plan") return [["The plan", [["arch", "Target architecture"], ["playbooks", "All playbooks"], ["gates", "Gates"], ["ws", "Workstreams"]]],
+    ["Playbooks", PB.map(p => [p.id, p.title, p])], ["Checks", [["qa", "QA test cases"], ["approval", "Final approval"], ["day1", "Day-one tasks"], ["esc", "Escalation & cadence"], ["read", "Background reading"]]]];
+  if (area === "results") return [["Problems and results", [["issues", "Problems and fixes", null, openI], ["results", "Results & KPIs"], ["log", "Implementation log"]]]];
+  if (area === "more") return [["Tracking", [["registry", "Tracking registry"], ["consistency", "Consistency check", null, S.A.problems], ["flow", "Data flow"], ["import", "Import current setup"], ["add", "Add one item"]]],
+    ["Guidance", [["guide", "How this app works"], ["kb", "Vendor guidance"], ["ref", "Schema & naming rules"]]],
+    ...(isAdmin() ? [["Admin", [["settings", "Settings & connections"], ["admin", "People and access"], ["activity", "Activity"]]]] : []), ["Account", [["password", "Change password"]]]];
+  return [["Start", [["guide", "How this app works"], ["mine", "My tasks"], ["arch", "Target architecture"], ["issues", "Problems and fixes", null, openI]]]];
 }
 function titleOf(h) {
   const p = PB.find(x => x.id === h); if (p) return p.no + " " + p.title;
@@ -1060,11 +1100,11 @@ function titleOf(h) {
   if (h.startsWith("sys-")) return SYS[h.slice(4)]?.name || "System";
   if (h.startsWith("kb-edit-") || h === "kb-new") return "Edit article";
   if (h.startsWith("kb-")) return S.data.kb.find(k => k.id === h.slice(3))?.title || "Article";
-  return { mine: "My tasks", overview: "Home", playbooks: "All playbooks", read: "Read this first", gates: "Gates", ws: "Workstreams", qa: "QA test cases", approval: "Final approval", day1: "Day-one tasks", esc: "Escalation & cadence",
+  return { guide: "How this app works", mine: "My tasks", overview: "Home", playbooks: "All playbooks", read: "Read this first", gates: "Gates", ws: "Workstreams", qa: "QA test cases", approval: "Final approval", day1: "Day-one tasks", esc: "Escalation & cadence",
     registry: "Tracking registry", consistency: "Consistency check", flow: "Data flow", import: "Import current setup", add: "Add one item", kb: "Vendor guidance", ref: "Schema & naming rules",
     results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", settings: "Settings & connections", more: "More", arch: "Target architecture", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
 }
-const VIEWS = { mine: vMine, overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings, more: vMore, arch: vArch };
+const VIEWS = { guide: vGuide, mine: vMine, overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings, more: vMore, arch: vArch };
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (S.me?.must_change) return () => vPassword(true);
@@ -1092,20 +1132,18 @@ function shell() {
 }
 function renderNav() {
   const c = curKey(), area = areaOf(c), openI = S.data.issues.filter(x => x.state === "open").length;
-  const areas = [...AREAS, ...(isAdmin() ? [{ id: "admin", label: "Admin", icon: "shield", href: "#admin" }] : [])];
-  $("#navmain").innerHTML = areas.map(a => `<a href="${a.href}" class="${a.id === area ? "on" : ""}">${icon(a.icon)}<span>${a.label}</span>${a.id === "results" && openI ? `<span class="badge">${openI}</span>` : a.id === "track" && (S.A.privacy.length + S.A.dups.length) ? `<span class="badge" title="Privacy conflicts and duplicates">${S.A.privacy.length + S.A.dups.length}</span>` : ""}</a>`).join("");
+  const areas = AREAS;
+  $("#navmain").innerHTML = areas.map(a => `<a href="${a.href}" class="${a.id === area ? "on" : ""}">${icon(a.icon)}<span>${a.label}</span>${a.id === "results" && openI ? `<span class="badge">${openI}</span>` : a.id === "tasks" && myOpenCount() ? `<span class="badge">${myOpenCount()}</span>` : ""}</a>`).join("");
   const groups = subnav(area);
   $("#subnav").innerHTML = groups.map(([h, items]) => `<h5>${h}</h5>` + items.map(([id, l, p, n]) => { const pr = p ? pbProgress(p) : null;
     return `<a href="#${id}" class="${id === c ? "on" : ""}">${p ? `<span class="no">${p.no}</span>` : ""}<span class="t">${esc(l)}</span>${p && isMine(p.owner) ? `<span class="mine" title="Yours"></span>` : ""}${pr ? `<span class="no" style="width:auto">${pr.d}/${pr.n}</span>` : n ? `<span class="badge">${n}</span>` : ""}</a>`; }).join("")).join("");
   // Phone: one compact "where am I / go to" picker instead of rows of chips.
   const mitems = groups.flatMap(([g, items]) => items.map(([id, l, p]) => [id, p ? `${p.no} ${l}` : l, g]));
-  const AREA_LABEL = { plan: "Playbooks", track: "Tracking", kb: "Knowledge", results: "Results", admin: "Admin" };
-  $("#mobsub").innerHTML = area === "home" || area === "more" || !mitems.length ? "" : `<label class="mobpick"><span>${AREA_LABEL[area] || "Section"}</span><select data-nav="1" aria-label="Go to page in ${AREA_LABEL[area] || "this section"}">${mitems.some(([id]) => id === c) ? "" : `<option value="" selected>${esc(titleOf(c))}</option>`}${groups.map(([g, items]) => `<optgroup label="${esc(g)}">${items.map(([id, l, p]) => `<option value="${id}" ${id === c ? "selected" : ""}>${esc(p ? p.no + " " + l : l)}</option>`).join("")}</optgroup>`).join("")}</select>${icon("chev-down", "sm")}</label>`;
-  const bkey = c === "issues" ? "problems" : ["kb", "results", "admin", "more"].includes(area) ? "more" : area;
-  $("#bottomnav").innerHTML = [["home", "Home", "home", "#overview"], ["plan", "Playbooks", "book", "#playbooks"], ["track", "Tracking", "radar", "#registry"], ["problems", "Problems", "alert", "#issues"], ["more", "More", "menu", "#more"]]
-    .map(([id, l, ic, href]) => `<a href="${href}" class="${id === bkey ? "on" : ""}" ${id === bkey ? 'aria-current="page"' : ""}>${icon(ic, "lg")}<span>${l}</span>${id === "problems" && openI ? `<span class="badge">${openI}</span>` : id === "home" && myOpenCount() ? `<span class="badge">${myOpenCount()}</span>` : ""}</a>`).join("");
+  const AREA_LABEL = { plan: "Plan", results: "Problems", more: "More" };
+  $("#mobsub").innerHTML = area === "home" || area === "tasks" || c === "more" || !mitems.length ? "" : `<label class="mobpick"><span>${AREA_LABEL[area] || "Section"}</span><select data-nav="1" aria-label="Go to page in ${AREA_LABEL[area] || "this section"}">${mitems.some(([id]) => id === c) ? "" : `<option value="" selected>${esc(titleOf(c))}</option>`}${groups.map(([g, items]) => `<optgroup label="${esc(g)}">${items.map(([id, l, p]) => `<option value="${id}" ${id === c ? "selected" : ""}>${esc(p ? p.no + " " + l : l)}</option>`).join("")}</optgroup>`).join("")}</select>${icon("chev-down", "sm")}</label>`;
+  $("#bottomnav").innerHTML = AREAS.map(a => `<a href="${a.href}" class="${a.id === area ? "on" : ""}" ${a.id === area ? 'aria-current="page"' : ""}>${icon(a.icon, "lg")}<span>${a.id === "tasks" ? "Tasks" : a.label}</span>${a.id === "results" && openI ? `<span class="badge">${openI}</span>` : a.id === "tasks" && myOpenCount() ? `<span class="badge">${myOpenCount()}</span>` : ""}</a>`).join("");
   const A2 = areas.find(a => a.id === area);
-  $("#crumbs").innerHTML = area === "home" && c === "overview" ? `<b>Home</b>` : c === "more" ? `<b>More</b>` : `<a href="${A2?.href || "#overview"}">${A2?.label || "Home"}</a>${icon("chev")}<b>${esc(titleOf(c))}</b>`;
+  $("#crumbs").innerHTML = area === "home" && c === "overview" ? `<b>Home</b>` : c === "more" ? `<b>More</b>` : c === "mine" ? `<b>My tasks</b>` : `<a href="${A2?.href || "#overview"}">${A2?.label || "Home"}</a>${icon("chev")}<b>${esc(titleOf(c))}</b>`;
   document.title = titleOf(c) + " · Wetility MarTech";
 }
 function renderMenu() {
