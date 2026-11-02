@@ -38,6 +38,7 @@ async function load() {
   S.data = await api("GET", "/api/state");
   S.me = S.data.me;
   S.statusMap = Object.fromEntries(S.data.statuses.map(s => [s.key, s]));
+  S.assignMap = Object.fromEntries((S.data.assignments || []).map(a => [a.key, a]));
   S.A = analyze();
 }
 function analyze() {
@@ -83,9 +84,16 @@ function analyze() {
 
 // ---------- small renderers ----------
 const OPT_ICON = { todo: "circle", progress: "play", done: "check", blocked: "x", pass: "check", fail: "x", approved: "check" };
+const assigneeOf = k => S.assignMap?.[k]?.user_id || null;
+const isMyTask = k => !!S.me && assigneeOf(k) === S.me.id;
+function ownerCtl(key) {
+  const a = assigneeOf(key);
+  if (!canWrite()) return `<div class="ownerctl ro">${icon("user", "sm")}<span>${a ? esc(nameOf(a)) + (a === S.me.id ? " (you)" : "") : "Unassigned"}</span></div>`;
+  return `<label class="ownerctl${a ? " set" : ""}${a === S.me.id ? " me" : ""}">${icon("user", "sm")}<select class="assign" data-key="${key}" aria-label="Owner"><option value="">Unassigned</option>${(S.data.users || []).map(u => `<option value="${u.id}" ${u.id === a ? "selected" : ""}>${esc(u.name)}${u.id === S.me.id ? " (you)" : ""}</option>`).join("")}</select></label>`;
+}
 function sel(key, opts) {
-  const v = st(key), r = S.statusMap[key], dis = canWrite() ? "" : "disabled";
-  return `<div class="stctl"><div class="seg" role="group" aria-label="Status">${opts.map(([k, l]) => `<button type="button" data-act="set-state" data-key="${key}" data-v="${k}" class="${k === v ? "on" : ""}" aria-pressed="${k === v}" ${dis}>${icon(OPT_ICON[k] || "circle", "sm")}${l}</button>`).join("")}</div>${r ? `<div class="stmeta">${esc(nameOf(r.by_user))} · ${fmtD(r.at)}</div>` : ""}</div>`;
+  const v = st(key), r = S.statusMap[key], dis = canWrite() || isMyTask(key) ? "" : "disabled";
+  return `<div class="stctl">${ownerCtl(key)}<div class="seg" role="group" aria-label="Status">${opts.map(([k, l]) => `<button type="button" data-act="set-state" data-key="${key}" data-v="${k}" class="${k === v ? "on" : ""}" aria-pressed="${k === v}" ${dis}>${icon(OPT_ICON[k] || "circle", "sm")}${l}</button>`).join("")}</div>${r ? `<div class="stmeta">${esc(nameOf(r.by_user))} · ${fmtD(r.at)}</div>` : ""}</div>`;
 }
 const pbProgress = p => { let d = 0, b = 0, g = 0; p.steps.forEach((_, i) => { const v = st(`${p.id}-s${i + 1}`); if (v === "done") d++; else if (v === "blocked") b++; else if (v === "progress") g++; }); return { d, b, g, n: p.steps.length }; };
 const bar = pr => { const w = x => (x / pr.n * 100).toFixed(1) + "%"; return `<div class="bar" role="img" aria-label="${pr.d} of ${pr.n} done"><i class="d" style="width:${w(pr.d)}"></i><i class="p" style="width:${w(pr.g)}"></i><i class="b" style="width:${w(pr.b)}"></i></div>`; };
@@ -213,6 +221,46 @@ function execBlock() {
     <p class="muted" style="font-size:12px;margin:8px 0 0">Findings as of ${esc(sm.asOf)}. The downloads add ownership by platform, all actions with owners, gaps and open problems.</p></details>` : ""}
   </section>`;
 }
+// ---------- tasks and owners ----------
+function taskInfo(k) {
+  let m;
+  if ((m = k.match(/^act-(.+)$/))) { const a = ACTIONS.find(x => x[0] === m[1]); if (a) return { kind: "Action " + a[0], title: a[2], due: a[1], href: "#arch", opts: STEP_OPTS }; }
+  if ((m = k.match(/^gap-(.+)$/))) { const g = GAPS.find(x => x[0] === m[1]); if (g) return { kind: "Gap " + g[0], title: g[1], href: "#arch", opts: STEP_OPTS }; }
+  if ((m = k.match(/^acc-(.+)$/))) { const a = ACCESS.find(x => x[0] === m[1]); if (a) return { kind: "Access review", title: a[1], href: "#arch", opts: STEP_OPTS }; }
+  if ((m = k.match(/^gate-(.+)$/))) { const g = GATES.find(x => x[0] === m[1]); if (g) return { kind: "Gate " + g[0], title: g[1], href: "#gates", opts: GATE_OPTS }; }
+  if ((m = k.match(/^qa-(.+)$/))) { const t = QA.find(x => x[0] === m[1]); if (t) return { kind: "QA test " + t[0], title: t[1], href: "#qa", opts: TEST_OPTS }; }
+  if ((m = k.match(/^ap-(\d+)$/))) return { kind: "Final approval", title: APPROVAL[m[1] - 1] || k, href: "#approval", opts: CHECK_OPTS };
+  if ((m = k.match(/^(dev|dm)-(\d+)$/))) return { kind: m[1] === "dev" ? "Day one: developer" : "Day one: digital marketing", title: (m[1] === "dev" ? DEV : DM)[m[2] - 1] || k, href: "#day1", opts: CHECK_OPTS };
+  if ((m = k.match(/^(.+)-(s|t)(\d+)$/))) { const p = PB.find(x => x.id === m[1]); if (p) return { kind: `Playbook ${p.no}, ${m[2] === "s" ? "step" : "test"} ${m[3]}`, title: (m[2] === "s" ? p.steps : p.tests)[m[3] - 1] || k, href: "#" + p.id, opts: m[2] === "s" ? STEP_OPTS : TEST_OPTS }; }
+  return { kind: "Task", title: k, href: "#overview", opts: STEP_OPTS };
+}
+const isClosed = v => ["done", "pass", "approved"].includes(v);
+function tasksFor(uid) {
+  const today = new Date().toISOString().slice(0, 10);
+  return (S.data.assignments || []).filter(a => uid === "all" || a.user_id === uid).map(a => ({ ...taskInfo(a.key), key: a.key, uid: a.user_id, at: a.at, v: st(a.key) }))
+    .map(t => ({ ...t, late: !!t.due && t.due < today && !isClosed(t.v) }))
+    .sort((a, b) => isClosed(a.v) - isClosed(b.v) || (a.due || "9999").localeCompare(b.due || "9999") || a.kind.localeCompare(b.kind));
+}
+const myOpenCount = () => S.me ? tasksFor(S.me.id).filter(t => !isClosed(t.v)).length : 0;
+function taskCard(t, showWho) {
+  const fmt = d => new Date(d + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" });
+  return `<div class="card task${isClosed(t.v) ? " done" : ""}"><div class="task-h"><span class="pill">${esc(t.kind)}</span>${t.due ? `<span class="pill ${t.late ? "bad" : ""}">${t.late ? "Overdue: " : "Due "}${fmt(t.due)}</span>` : ""}${showWho ? `<span class="pill sun">${esc(nameOf(t.uid))}</span>` : ""}<a class="task-open" href="${t.href}">Open ${icon("chev", "sm")}</a></div>
+   <p class="task-t">${esc(t.title)}</p>${sel(t.key, t.opts)}</div>`;
+}
+function vMine() {
+  const who = S.mineFor ?? S.me.id, list = tasksFor(who), open = list.filter(t => !isClosed(t.v)), done = list.length - open.length;
+  const picker = canWrite() ? `<label class="mobpick" style="margin:0 0 14px"><span>Show tasks for</span><select data-mine="1"><option value="${S.me.id}" ${who === S.me.id ? "selected" : ""}>Me</option>${(S.data.users || []).filter(u => u.id !== S.me.id).map(u => `<option value="${u.id}" ${who === u.id ? "selected" : ""}>${esc(u.name)}</option>`).join("")}<option value="all" ${who === "all" ? "selected" : ""}>Everyone</option></select></label>` : "";
+  return `<div class="eyebrow">Tasks</div><h1>${who === S.me.id ? "My tasks" : who === "all" ? "Everyone's tasks" : esc(nameOf(who)) + "'s tasks"}</h1>
+  <p class="muted">${open.length} open, ${done} done. Owners are set on each task with the Owner picker${canWrite() ? "" : " (editors and admins assign them)"}; the owner can update the status of their own tasks.</p>${picker}
+  ${list.length ? `<div class="tasks">${open.map(t => taskCard(t, who === "all")).join("")}</div>${done ? `<details class="exec-more"><summary>Done (${done})</summary><div class="tasks">${list.filter(t => isClosed(t.v)).map(t => taskCard(t, who === "all")).join("")}</div></details>` : ""}`
+    : `<div class="card" style="padding:16px"><b>Nothing assigned yet.</b><p class="muted" style="margin:6px 0 0">Tasks start unassigned. Open <a href="#arch">Target architecture</a> or any playbook and choose an owner on a task.</p></div>`}`;
+}
+function myTasksBlock() {
+  if (!S.me) return "";
+  const open = tasksFor(S.me.id).filter(t => !isClosed(t.v));
+  if (!open.length) return "";
+  return `<h2>${icon("user")} Assigned to you <span class="pill sun">${open.length}</span></h2><div class="tasks">${open.slice(0, 4).map(t => taskCard(t, false)).join("")}</div>${open.length > 4 ? `<p class="by"><a href="#mine">All ${open.length} of your tasks</a></p>` : ""}`;
+}
 function vOverview() {
   const all = PB.reduce((a, p) => { const r = pbProgress(p); a.d += r.d; a.n += r.n; return a; }, { d: 0, n: 0 });
   const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
@@ -228,6 +276,7 @@ function vOverview() {
   <div class="stats"><a href="#playbooks"><b>${Math.round(all.d / all.n * 100)}%</b><span>Steps done ›</span></a><a href="#gates"><b>${gatesOk}/7</b><span>Gates approved ›</span></a><a href="#issues"><b>${openIssues}</b><span>Open problems ›</span></a><a href="#consistency"><b>${S.A.score == null ? "–" : S.A.score + "%"}</b><span>Names consistent ›</span></a></div>
   <div class="focus"><label for="iam2" style="font-size:13px;color:#B9C6DA">Focus on</label><select id="iam2" data-focus="1"><option value="">Everyone</option>${PEOPLE.map(n => `<option ${n === filterMe ? "selected" : ""}>${n}</option>`).join("")}</select></div></section>
   <div class="cols"><div>
+   ${myTasksBlock()}
    ${execBlock()}
    <a class="tile link starthere" href="#arch">${icon("target")}<div class="l"><b>Start here: target architecture</b><br>${GAPS.filter(g => st("gap-" + g[0]) === "done").length} of ${GAPS.length} gaps closed. What to fix, in what order, and why</div>${icon("chev", "sm go")}</a>
    <h2>${icon("check")} Next actions</h2>
@@ -971,7 +1020,7 @@ function vMore() {
   const item = (href, ic, t, sub, extra = "") => `<a class="tile link morei" href="${href}">${icon(ic)}<div class="l"><b>${t}</b>${sub ? `<br>${sub}` : ""}</div>${extra}${icon("chev", "sm go")}</a>`;
   const btn = (act, ic, t) => `<button class="tile link morei" data-act="${act}">${icon(ic)}<div class="l"><b>${t}</b></div>${icon("chev", "sm go")}</button>`;
   return `<h1>More</h1>
-  <div class="morelist">${item("#arch", "target", "Target architecture", "Start here: what to fix, in what order, and why")}</div>
+  <div class="morelist">${item("#mine", "user", "My tasks", `${myOpenCount()} open`)}${item("#arch", "target", "Target architecture", "Start here: what to fix, in what order, and why")}</div>
   <h3 class="moreh">Knowledge</h3><div class="morelist">${item("#kb", "bulb", "Vendor guidance", "Current step-by-step guides per platform")}${item("#ref", "table", "Schema & naming rules", "How events and fields must be named")}</div>
   <h3 class="moreh">Results</h3><div class="morelist">${item("#issues", "alert", "Problems and fixes", `${openI} open`)}${item("#results", "chart", "Results & KPIs", "Is the implementation delivering?")}${item("#log", "log", "Implementation log", "What was done, when, by whom")}</div>
   ${isAdmin() ? `<h3 class="moreh">Admin</h3><div class="morelist">${item("#settings", "key", "Settings & connections", "API keys and syncs")}${item("#admin", "shield", "People and access", "Invite people, roles")}${item("#activity", "log", "Activity", "Every change, newest first")}</div>` : ""}
@@ -986,7 +1035,7 @@ const AREAS = [
   { id: "kb", label: "Knowledge", icon: "bulb", href: "#kb" },
   { id: "results", label: "Results", icon: "chart", href: "#results" }];
 function areaOf(h) {
-  if (!h || h === "overview") return "home";
+  if (!h || h === "overview" || h === "mine") return "home";
   if (["playbooks", "arch", "read", "gates", "ws", "qa", "approval", "day1", "esc"].includes(h) || PB.some(p => p.id === h)) return "plan";
   if (["registry", "consistency", "flow", "import", "add"].includes(h) || h.startsWith("f-") || h.startsWith("sys-")) return "track";
   if (h === "kb" || h.startsWith("kb-") || h === "ref") return "kb";
@@ -1011,11 +1060,11 @@ function titleOf(h) {
   if (h.startsWith("sys-")) return SYS[h.slice(4)]?.name || "System";
   if (h.startsWith("kb-edit-") || h === "kb-new") return "Edit article";
   if (h.startsWith("kb-")) return S.data.kb.find(k => k.id === h.slice(3))?.title || "Article";
-  return { overview: "Home", playbooks: "All playbooks", read: "Read this first", gates: "Gates", ws: "Workstreams", qa: "QA test cases", approval: "Final approval", day1: "Day-one tasks", esc: "Escalation & cadence",
+  return { mine: "My tasks", overview: "Home", playbooks: "All playbooks", read: "Read this first", gates: "Gates", ws: "Workstreams", qa: "QA test cases", approval: "Final approval", day1: "Day-one tasks", esc: "Escalation & cadence",
     registry: "Tracking registry", consistency: "Consistency check", flow: "Data flow", import: "Import current setup", add: "Add one item", kb: "Vendor guidance", ref: "Schema & naming rules",
     results: "Results & KPIs", log: "Implementation log", issues: "Problems and fixes", search: "Search", settings: "Settings & connections", more: "More", arch: "Target architecture", admin: "People and access", activity: "Activity", password: "Password" }[h] || "Home";
 }
-const VIEWS = { overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings, more: vMore, arch: vArch };
+const VIEWS = { mine: vMine, overview: vOverview, playbooks: vPlaybooks, read: vRead, gates: vGates, ws: vWS, qa: vQA, results: vResults, log: vLog, issues: vIssues, registry: vRegistry, consistency: vConsistency, flow: vFlow, add: vAdd, kb: vKB, ref: vRef, day1: vDay1, esc: vEsc, approval: vApproval, search: vSearch, import: vImport, password: () => vPassword(false), admin: vAdmin, activity: vActivity, settings: vSettings, more: vMore, arch: vArch };
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (S.me?.must_change) return () => vPassword(true);
@@ -1054,7 +1103,7 @@ function renderNav() {
   $("#mobsub").innerHTML = area === "home" || area === "more" || !mitems.length ? "" : `<label class="mobpick"><span>${AREA_LABEL[area] || "Section"}</span><select data-nav="1" aria-label="Go to page in ${AREA_LABEL[area] || "this section"}">${mitems.some(([id]) => id === c) ? "" : `<option value="" selected>${esc(titleOf(c))}</option>`}${groups.map(([g, items]) => `<optgroup label="${esc(g)}">${items.map(([id, l, p]) => `<option value="${id}" ${id === c ? "selected" : ""}>${esc(p ? p.no + " " + l : l)}</option>`).join("")}</optgroup>`).join("")}</select>${icon("chev-down", "sm")}</label>`;
   const bkey = c === "issues" ? "problems" : ["kb", "results", "admin", "more"].includes(area) ? "more" : area;
   $("#bottomnav").innerHTML = [["home", "Home", "home", "#overview"], ["plan", "Playbooks", "book", "#playbooks"], ["track", "Tracking", "radar", "#registry"], ["problems", "Problems", "alert", "#issues"], ["more", "More", "menu", "#more"]]
-    .map(([id, l, ic, href]) => `<a href="${href}" class="${id === bkey ? "on" : ""}" ${id === bkey ? 'aria-current="page"' : ""}>${icon(ic, "lg")}<span>${l}</span>${id === "problems" && openI ? `<span class="badge">${openI}</span>` : ""}</a>`).join("");
+    .map(([id, l, ic, href]) => `<a href="${href}" class="${id === bkey ? "on" : ""}" ${id === bkey ? 'aria-current="page"' : ""}>${icon(ic, "lg")}<span>${l}</span>${id === "problems" && openI ? `<span class="badge">${openI}</span>` : id === "home" && myOpenCount() ? `<span class="badge">${myOpenCount()}</span>` : ""}</a>`).join("");
   const A2 = areas.find(a => a.id === area);
   $("#crumbs").innerHTML = area === "home" && c === "overview" ? `<b>Home</b>` : c === "more" ? `<b>More</b>` : `<a href="${A2?.href || "#overview"}">${A2?.label || "Home"}</a>${icon("chev")}<b>${esc(titleOf(c))}</b>`;
   document.title = titleOf(c) + " · Wetility MarTech";
@@ -1140,13 +1189,18 @@ document.addEventListener("change", async e => {
   if (e.target.matches("select[data-nav]")) { if (e.target.value) location.hash = e.target.value; return; }
   const el = e.target;
   if (el.id === "pick") { location.hash = el.value; return; }
+  if (el.dataset.mine) { S.mineFor = el.value === "all" ? "all" : +el.value; render(); return; }
   if (el.id === "iam" || el.dataset.focus) { filterMe = el.value || null; try { filterMe ? localStorage.setItem("mt_me", filterMe) : localStorage.removeItem("mt_me"); } catch (_) {} render(true); return; }
   if (el.id === "iflt") { S.flag = el.value; render(); return; }
   if (el.id === "regkind") { S.regKind = el.value; render(); return; }
   if (el.id === "regprob") { S.regProb = el.value; render(); return; }
   if (el.name === "system" && el.dataset.kinds) { const dl = document.getElementById(el.dataset.kinds.replace("ik-", "kl-")); if (dl) dl.innerHTML = (SYS[el.value]?.kinds || []).map(k => `<option value="${esc(k)}">`).join(""); const inp = document.getElementById(el.dataset.kinds); if (inp) inp.value = SYS[el.value]?.kinds?.[0] || ""; return; }
   try {
-    if (el.classList.contains("state")) { el.dataset.v = el.value; await api("POST", "/api/status", { key: el.dataset.key, state: el.value }); toast("Status saved"); await refresh(); }
+    if (el.classList.contains("assign")) { const key = el.dataset.key, uid = el.value ? +el.value : null;
+      if (uid) S.assignMap[key] = { key, user_id: uid, by_user: S.me.id, at: new Date().toISOString() }; else delete S.assignMap[key];
+      S.data.assignments = Object.values(S.assignMap);
+      await api("POST", "/api/assign", { key, user_id: uid }); toast(uid ? `Assigned to ${nameOf(uid)}` : "Unassigned"); S.ver = null; render(true); }
+    else if (el.classList.contains("state")) { el.dataset.v = el.value; await api("POST", "/api/status", { key: el.dataset.key, state: el.value }); toast("Status saved"); await refresh(); }
     else if (el.dataset.act === "map" && el.value) { await api("PUT", "/api/impls/" + el.dataset.id, { field_id: el.value }); toast("Mapped"); await refresh(); }
     else if (el.dataset.act === "role") { await api("PATCH", "/api/users/" + el.dataset.id, { role: el.value }); S.users = null; toast("Role updated"); render(true); }
   } catch (err) { toast(err.message); }
@@ -1197,7 +1251,7 @@ document.addEventListener("click", async e => {
   if (act === "pbtab") { S.pbTab[b.dataset.pb] = b.dataset.tab; S.inline = null; render(true); return; }
   if (act === "inline") { S.inline = S.inline === b.dataset.k ? null : b.dataset.k || null; render(true); setTimeout(() => document.querySelector("#view .inline input:not([type=hidden]), #view .inline textarea")?.focus(), 0); return; }
   if (act === "kbf") { S.kbF = b.dataset.f; render(true); return; }
-  if (act === "set-state") { if (!canWrite()) return; const key = b.dataset.key, v = b.dataset.v; S.statusMap[key] = { ...(S.statusMap[key] || {}), state: v, by_user: S.me.id, at: new Date().toISOString() }; render(true);
+  if (act === "set-state") { if (!canWrite() && !isMyTask(b.dataset.key)) return; const key = b.dataset.key, v = b.dataset.v; S.statusMap[key] = { ...(S.statusMap[key] || {}), state: v, by_user: S.me.id, at: new Date().toISOString() }; render(true);
     try { await api("POST", "/api/status", { key, state: v }); toast({ done: "Marked done", pass: "Marked passed", fail: "Marked failed", blocked: "Marked blocked", progress: "In progress", approved: "Approved", todo: "Status cleared" }[v] || "Saved"); S.ver = null; } catch (err) { toast(err.message); await refresh(); } return; }
   const confirmFirst = ["del-comments", "del-logs", "del-results", "del-impl", "user-del", "merge", "reset", "conn-remove"];
   if (confirmFirst.includes(act) && !b.dataset.armed) { b.dataset.armed = "1"; const t = b.textContent; b.textContent = "Click again to confirm"; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = t; } }, 3500); return; }

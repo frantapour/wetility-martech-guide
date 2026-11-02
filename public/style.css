@@ -569,3 +569,16 @@ ol.seq{padding-left:20px}ol.seq li{margin:8px 0}
 .exec-more summary{cursor:pointer;font-weight:600;padding:8px 0;min-height:44px;display:flex;align-items:center}
 .exec-msgs{padding-left:18px;margin:4px 0 12px}.exec-msgs li{margin:0 0 8px;line-height:1.5}
 @media (max-width:640px){.exec-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.exec-top .acts{width:100%}.exec-top .acts .btn{flex:1;text-align:center;justify-content:center}}
+/* Task owners */
+.stctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ownerctl{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--line-strong);border-radius:8px;padding:2px 6px 2px 8px;min-height:36px;color:var(--muted);font-size:13px}
+.ownerctl select{background:transparent;border:0;color:inherit;font:inherit;padding:6px 2px;min-height:32px;max-width:180px}
+.ownerctl.set{border-style:solid;color:var(--fg)}
+.ownerctl.me{border-color:var(--sun-line);color:var(--y)}
+.ownerctl.ro{border-style:solid}
+.tasks{display:grid;gap:10px;margin:0 0 14px}
+.task{padding:12px 14px}
+.task.done{opacity:.7}
+.task-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.task-open{margin-left:auto;display:inline-flex;align-items:center;gap:2px;min-height:36px;font-size:14px}
+.task-t{margin:8px 0 10px;line-height:1.45}

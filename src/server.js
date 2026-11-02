@@ -133,7 +133,7 @@ app.post("/api/password", auth, wrap(async (req, res) => {
 
 // ---------- state ----------
 app.get("/api/state", auth, wrap(async (req, res) => {
-  const [users, statuses, comments, logs, issues, results, kb, fields, impls, auditRows] = await Promise.all([
+  const [users, statuses, comments, logs, issues, results, kb, fields, impls, auditRows, assignments] = await Promise.all([
     q("SELECT id,name,role FROM users ORDER BY name"),
     q("SELECT key,state,by_user,at FROM statuses"),
     q("SELECT * FROM comments ORDER BY at"),
@@ -144,10 +144,11 @@ app.get("/api/state", auth, wrap(async (req, res) => {
     q("SELECT * FROM fields ORDER BY name"),
     q("SELECT * FROM impls ORDER BY system, name"),
     q("SELECT * FROM audit ORDER BY at DESC LIMIT 300"),
+    q("SELECT key,user_id,by_user,at FROM assignments"),
   ]);
   res.json({
     me: req.user, users: users.rows, statuses: statuses.rows, comments: comments.rows, logs: logs.rows,
-    issues: issues.rows, results: results.rows, kb: kb.rows, fields: fields.rows, impls: impls.rows, audit: auditRows.rows,
+    issues: issues.rows, results: results.rows, kb: kb.rows, fields: fields.rows, impls: impls.rows, audit: auditRows.rows, assignments: assignments.rows,
   });
 }));
 
@@ -158,14 +159,29 @@ app.get("/api/version", auth, wrap(async (req, res) => {
     (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM impls), (SELECT count(*)||':'||coalesce(max(updated_at)::text,'') FROM fields),
     (SELECT count(*)||':'||coalesce(max(updated_at)::text,'') FROM kb), (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM logs),
     (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM comments), (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM results),
-    (SELECT coalesce(max(id),0) FROM audit), (SELECT count(*) FROM users)) AS v`);
+    (SELECT coalesce(max(id),0) FROM audit), (SELECT count(*) FROM users), (SELECT count(*)||':'||coalesce(max(at)::text,'') FROM assignments)) AS v`);
   res.set("Cache-Control", "no-store").json({ v: r.rows[0].v, build: BUILD });
 }));
-app.post("/api/status", auth, canWrite, wrap(async (req, res) => {
+app.post("/api/status", auth, wrap(async (req, res) => {
   const key = str(req.body.key, 80), state = str(req.body.state, 20);
   if (!/^[a-z0-9-]+$/i.test(key) || !state) return bad(res, "Invalid status.");
+  if (req.user.must_change) return bad(res, "Set a new password first.", 403);
+  if (!["admin", "editor"].includes(req.user.role) && !(await q("SELECT 1 FROM assignments WHERE key=$1 AND user_id=$2", [key, req.user.id])).rowCount)
+    return bad(res, "You can update tasks assigned to you. Ask an admin for editor access to update others.", 403);
   await q(`INSERT INTO statuses (key,state,by_user,at) VALUES ($1,$2,$3,now())
     ON CONFLICT (key) DO UPDATE SET state=EXCLUDED.state, by_user=EXCLUDED.by_user, at=now()`, [key, state, req.user.id]);
+  res.json({ ok: true });
+}));
+
+// Task owners: one person per task key (actions, gaps, access reviews, playbook steps and tests, gates, QA, checklists).
+app.post("/api/assign", auth, canWrite, wrap(async (req, res) => {
+  const key = str(req.body.key, 80), uid = req.body.user_id === null || req.body.user_id === "" ? null : Number(req.body.user_id);
+  if (!/^[a-z0-9-]+$/i.test(key)) return bad(res, "Invalid task.");
+  if (uid === null) { await q("DELETE FROM assignments WHERE key=$1", [key]); await audit(req, "task", key, "unassigned"); return res.json({ ok: true }); }
+  const u = await q("SELECT id,name FROM users WHERE id=$1", [uid]);
+  if (!u.rowCount) return bad(res, "That person does not have a login yet.");
+  await q(`INSERT INTO assignments (key,user_id,by_user,at) VALUES ($1,$2,$3,now()) ON CONFLICT (key) DO UPDATE SET user_id=EXCLUDED.user_id, by_user=EXCLUDED.by_user, at=now()`, [key, uid, req.user.id]);
+  await audit(req, "task", key, "assigned", { to: u.rows[0].name });
   res.json({ ok: true });
 }));
 
