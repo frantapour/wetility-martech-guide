@@ -471,14 +471,19 @@ function vRegistry() {
   <div class="regcards">${fields.map(fieldCard).join("") || `<div class="empty">No fields match.</div>`}</div>
   <div class="tbl regwrap"><table class="regtbl"><tr><th rowspan="2">Canonical field</th>${layerCounts.map(([l, n]) => `<th class="layer" colspan="${n}">${l}</th>`).join("")}</tr><tr>${SYSTEMS.map(s => `<th><a href="#sys-${s.id}">${esc(s.short)}</a></th>`).join("")}</tr>
   ${fields.map(fieldRow).join("") || `<tr><td colspan="${SYSTEMS.length + 1}" class="muted">No fields match.</td></tr>`}</table></div>
-  ${A.unmapped.length ? `<h2>Items not mapped to a canonical field</h2><p class="muted">Map each to an existing field, or create a canonical field if it is genuinely new.</p>${A.unmapped.map(unmappedRow).join("")}` : ""}`;
+  ${A.unmapped.length ? `<h2>Items not mapped to a canonical field</h2><p class="muted">Map each to an existing field, or create a canonical field if it is genuinely new.</p>${paged("reg-unmapped", A.unmapped, unmappedRow)}` : ""}`;
+}
+// Long lists render 50 at a time: thousands of synced items made pages with 100,000+ elements and froze the browser.
+function paged(k, items, row, size = 50) {
+  const n = (S.pageN ||= {})[k] || size, shown = items.slice(0, n);
+  return shown.map(row).join("") + (items.length > n ? `<button class="btn showmore" data-act="more" data-k="${k}" data-n="${n + size}">Show ${Math.min(size, items.length - n)} more (${items.length - n} not shown)</button>` : "");
 }
 function fieldOptions(selected, allowNone) {
   return `${allowNone ? `<option value="">Not mapped yet</option>` : ""}${S.data.fields.filter(f => f.status !== "deprecated").map(f => `<option value="${f.id}" ${f.id === selected ? "selected" : ""}>${esc(f.name)} (${f.kind})</option>`).join("")}`;
 }
 function unmappedRow(i) {
   return `<div class="impl"><div class="t"><b>${esc(sysName(i.system))}</b><span class="muted">${esc(i.kind)}</span><code>${esc(i.name)}</code>${i.label ? `<span class="muted">${esc(i.label)}</span>` : ""}</div>${i.description ? `<div class="muted" style="font-size:13px">${esc(i.description)}</div>` : ""}
-  ${canWrite() ? `<div class="acts"><label class="muted" for="map-${i.id}" style="font-size:12.5px">Map to</label><select id="map-${i.id}" data-act="map" data-id="${i.id}">${fieldOptions(null, true)}</select></div>` : ""}</div>`;
+  ${canWrite() ? `<div class="acts">${S.mapOpen === i.id ? `<label class="muted" for="map-${i.id}" style="font-size:12.5px">Map to</label><select id="map-${i.id}" data-act="map" data-id="${i.id}">${fieldOptions(null, true)}</select>` : `<button class="btn" data-act="map-open" data-id="${i.id}">Map to a canonical field</button>`}</div>` : ""}</div>`;
 }
 function implCard(i, f) {
   const A = S.A, c = A.code[i.id];
@@ -562,7 +567,7 @@ function vAdd() {
 }
 function vConsistency() {
   const A = S.A;
-  const sec = (title, why, items, row) => `<h2 id="${secId(title)}">${title} <span class="muted" style="font:400 14px var(--f-body)">${items.length}</span></h2><p class="muted">${why}</p>${items.length ? items.map(row).join("") : `<div class="empty">None.</div>`}`;
+  const sec = (title, why, items, row) => `<h2 id="${secId(title)}">${title} <span class="muted" style="font:400 14px var(--f-body)">${items.length}</span></h2><p class="muted">${why}</p>${items.length ? paged("cons-" + secId(title), items, row) : `<div class="empty">None.</div>`}`;
   const implLine = (i, extra = "") => { const f = A.fieldOf(i.field_id); return `<div class="impl"><div class="t"><b>${esc(sysName(i.system))}</b><span class="muted">${esc(i.kind)}</span>${chip(i)}${f ? `<span class="muted">→</span><a href="#f-${f.id}"><code>${esc(f.name)}</code></a>` : ""}${i.label ? `<span class="muted" style="font-size:12.5px">${esc(i.label)}</span>` : ""}</div>${extra}</div>`; };
   const acts = i => canWrite() ? `<div class="acts">${A.code[i.id] === "pending" ? `<button class="btn primary" data-act="renamed" data-id="${i.id}">Renamed in ${esc(sysName(i.system))}</button>` : `<button class="btn" data-act="align" data-id="${i.id}">Align to canonical</button>`}<button class="btn" data-act="std-on" data-id="${i.id}">Name is fixed</button></div>` : "";
   return `<div class="eyebrow">Data and tracking</div><h1>Consistency check</h1>
@@ -1288,6 +1293,8 @@ document.addEventListener("click", async e => {
   if (act === "scrollto") { const t = document.getElementById(b.dataset.t); if (t instanceof HTMLDetailsElement) t.open = true; t?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (act === "pbtab") { S.pbTab[b.dataset.pb] = b.dataset.tab; S.inline = null; render(true); return; }
   if (act === "inline") { S.inline = S.inline === b.dataset.k ? null : b.dataset.k || null; render(true); setTimeout(() => document.querySelector("#view .inline input:not([type=hidden]), #view .inline textarea")?.focus(), 0); return; }
+  if (act === "more") { (S.pageN ||= {})[b.dataset.k] = +b.dataset.n; render(true); return; }
+  if (act === "map-open") { S.mapOpen = +b.dataset.id; render(true); setTimeout(() => document.getElementById("map-" + b.dataset.id)?.focus(), 0); return; }
   if (act === "kbf") { S.kbF = b.dataset.f; render(true); return; }
   if (act === "set-state") { if (!canWrite() && !isMyTask(b.dataset.key)) return; const key = b.dataset.key, v = b.dataset.v; S.statusMap[key] = { ...(S.statusMap[key] || {}), state: v, by_user: S.me.id, at: new Date().toISOString() }; render(true);
     try { await api("POST", "/api/status", { key, state: v }); toast({ done: "Marked done", pass: "Marked passed", fail: "Marked failed", blocked: "Marked blocked", progress: "In progress", approved: "Approved", todo: "Status cleared" }[v] || "Saved"); S.ver = null; } catch (err) { toast(err.message); await refresh(); } return; }

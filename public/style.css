@@ -593,3 +593,4 @@ ol.seq{padding-left:20px}ol.seq li{margin:8px 0}
 .guide-sec>div{flex:1}
 .guide-sec:hover{border-color:var(--sun-line)}
 .guidetile{margin:0 0 10px}
+.showmore{display:block;width:100%;margin:8px 0 14px;min-height:44px}
