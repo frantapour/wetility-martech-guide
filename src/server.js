@@ -48,6 +48,7 @@ const { seedV40 } = require("./seed_v40");
 const { seedV41 } = require("./seed_v41");
 const { seedV42 } = require("./seed_v42");
 const { seedV43 } = require("./seed_v43");
+const { seedV44 } = require("./seed_v44");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -566,6 +567,7 @@ app.use((err, req, res, next) => {
   await seedV41();
   await seedV42();
   await seedV43();
+  await seedV44();
   q(`SELECT (SELECT count(*) FROM impls) n_impls, (SELECT count(*) FROM issues) n_issues,
       (SELECT sum(length(row_to_json(t)::text)) FROM impls t) + (SELECT sum(length(row_to_json(t)::text)) FROM issues t) + (SELECT coalesce(sum(length(row_to_json(t)::text)),0) FROM kb t) + (SELECT coalesce(sum(length(row_to_json(t)::text)),0) FROM fields t) AS state_bytes`)
     .then(r => console.log("STATE SIZE", JSON.stringify(r.rows[0]))).catch(() => {});
